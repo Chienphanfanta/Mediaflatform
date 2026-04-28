@@ -21,6 +21,7 @@ export type RetryOptions = {
 
 export const CHANNEL_SELECT = {
   id: true,
+  tenantId: true,
   platform: true,
   accountId: true,
   accessToken: true,

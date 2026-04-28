@@ -1,4 +1,5 @@
-// Augment types cho NextAuth — thêm groups, permissions, isSuperAdmin vào session + JWT.
+// Augment types cho NextAuth — thêm tenantId/tenantSlug + groups/permissions/isSuperAdmin
+// vào session + JWT.
 import type { GroupType, MemberRole } from '@prisma/client';
 
 type UserGroup = { id: string; name: string; type: GroupType; role: MemberRole };
@@ -6,6 +7,8 @@ type UserGroup = { id: string; name: string; type: GroupType; role: MemberRole }
 declare module 'next-auth' {
   interface User {
     id?: string;
+    tenantId?: string;
+    tenantSlug?: string;
     groups?: UserGroup[];
     permissions?: Record<string, string[]>;
     isSuperAdmin?: boolean;
@@ -14,6 +17,8 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
+      tenantId: string;
+      tenantSlug: string;
       email?: string | null;
       name?: string | null;
       image?: string | null;
@@ -28,6 +33,8 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
+    tenantId: string;
+    tenantSlug: string;
     groups: UserGroup[];
     permissions: Record<string, string[]>;
     isSuperAdmin: boolean;
@@ -37,6 +44,8 @@ declare module 'next-auth/jwt' {
 declare module '@auth/core/jwt' {
   interface JWT {
     id: string;
+    tenantId: string;
+    tenantSlug: string;
     groups: UserGroup[];
     permissions: Record<string, string[]>;
     isSuperAdmin: boolean;

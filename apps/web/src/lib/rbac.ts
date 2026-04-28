@@ -25,6 +25,8 @@ export type UserGroupSession = {
 
 export type SessionUser = {
   id: string;
+  tenantId: string;
+  tenantSlug: string;
   email?: string | null;
   name?: string | null;
   image?: string | null;

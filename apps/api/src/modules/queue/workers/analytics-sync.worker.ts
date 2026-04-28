@@ -71,6 +71,7 @@ export class AnalyticsSyncWorker extends WorkerHost {
         where: { id: channelId },
         select: {
           id: true,
+          tenantId: true,
           status: true,
           platform: true,
           syncPriority: true,
@@ -140,7 +141,7 @@ export class AnalyticsSyncWorker extends WorkerHost {
       // Dispatch
       let result: { daysFetched: number; rowsUpserted: number; skippedReason?: string };
       try {
-        result = await this.dispatch(channelId, platform);
+        result = await this.dispatch(channelId, channel.tenantId, platform);
       } catch (err) {
         const msg = (err as Error).message;
         await this.syncLog.log({
@@ -216,6 +217,7 @@ export class AnalyticsSyncWorker extends WorkerHost {
 
   private async dispatch(
     channelId: string,
+    tenantId: string,
     platform: Platform,
   ): Promise<{ daysFetched: number; rowsUpserted: number; skippedReason?: string }> {
     switch (platform) {
@@ -258,6 +260,7 @@ export class AnalyticsSyncWorker extends WorkerHost {
         await this.prisma.analytics.upsert({
           where: { channelId_date: { channelId, date: today } },
           create: {
+            tenantId,
             channelId,
             date: today,
             platform: Platform.TELEGRAM,

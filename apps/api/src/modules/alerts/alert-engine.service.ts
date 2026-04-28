@@ -61,6 +61,7 @@ export class AlertEngineService {
       where: { id: channelId },
       select: {
         id: true,
+        tenantId: true,
         name: true,
         platform: true,
         status: true,
@@ -140,6 +141,7 @@ export class AlertEngineService {
 
     return this.upsertAlert({
       channelId: channel.id,
+      tenantId: channel.tenantId,
       type: AlertType.VIEW_DROP,
       severity,
       message: `${channel.name}: views giảm ${dropPct.toFixed(0)}% so với TB 7 ngày`,
@@ -221,6 +223,7 @@ export class AlertEngineService {
 
     return this.upsertAlert({
       channelId: channel.id,
+      tenantId: channel.tenantId,
       type: AlertType.MONETIZATION_AT_RISK,
       severity,
       message: `${channel.name}: nguy cơ không đạt monetization (${reasons.join(', ')})`,
@@ -271,6 +274,7 @@ export class AlertEngineService {
         : AlertSeverity.LOW;
     return this.upsertAlert({
       channelId: channel.id,
+      tenantId: channel.tenantId,
       type: AlertType.CHANNEL_INACTIVE,
       severity,
       message: `${channel.name}: theo dõi tần suất hoạt động (${Math.round(daysSinceCreated)} ngày kể từ khi tạo)`,
@@ -294,6 +298,7 @@ export class AlertEngineService {
       // service. Tạo alert TOKEN_EXPIRED severity HIGH.
       return this.upsertAlert({
         channelId: channel.id,
+        tenantId: channel.tenantId,
         type: AlertType.TOKEN_EXPIRED,
         severity: AlertSeverity.HIGH,
         message: `${channel.name}: token đã hết hạn — cần kết nối lại`,
@@ -308,6 +313,7 @@ export class AlertEngineService {
     // qua next sync (withTokenRefresh pre-emptive). Engine chỉ tạo alert.
     return this.upsertAlert({
       channelId: channel.id,
+      tenantId: channel.tenantId,
       type: AlertType.TOKEN_EXPIRING,
       severity: AlertSeverity.HIGH,
       message: `${channel.name}: token sắp hết hạn trong ${daysLeft.toFixed(1)} ngày`,
@@ -331,6 +337,7 @@ export class AlertEngineService {
    */
   private async upsertAlert(input: {
     channelId: string;
+    tenantId: string;
     type: AlertType;
     severity: AlertSeverity;
     message: string;
@@ -351,6 +358,7 @@ export class AlertEngineService {
     if (!existing) {
       await this.prisma.alert.create({
         data: {
+          tenantId: input.tenantId,
           channelId: input.channelId,
           type: input.type,
           severity: input.severity,
@@ -390,6 +398,7 @@ export class AlertEngineService {
 
 type ChannelLike = {
   id: string;
+  tenantId: string;
   name: string;
   platform: Platform;
   status: string;

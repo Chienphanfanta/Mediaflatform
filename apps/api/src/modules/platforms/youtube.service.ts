@@ -79,6 +79,7 @@ const ANALYTICS_DAYS_LOOKBACK = 7; // YT Analytics có lag ~1 ngày — fetch 7 
 // Channel fields cần cho mọi op
 const CHANNEL_SELECT = {
   id: true,
+  tenantId: true,
   platform: true,
   accountId: true,
   accessToken: true,
@@ -182,6 +183,7 @@ export class YouTubeService {
       await this.prisma.analytics.upsert({
         where: { channelId_date: { channelId, date: dateOnly } },
         create: {
+          tenantId: channel.tenantId,
           channelId,
           date: dateOnly,
           platform: Platform.YOUTUBE,

@@ -63,7 +63,9 @@ export const POST = withAuth(
       });
     }
 
-    const group = await prisma.group.create({ data: parsed.data });
+    const group = await prisma.group.create({
+      data: { ...parsed.data, tenantId: user.tenantId },
+    });
     return ok(group, { status: 201 });
   },
   { rateLimit: { limit: 20, windowMs: 60_000 } },

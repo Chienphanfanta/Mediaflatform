@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 export type CreateAlertInput = {
   channelId: string;
+  tenantId?: string; // optional — sẽ tự lookup từ channel nếu không truyền
   type: AlertType;
   severity: AlertSeverity;
   message: string;
@@ -109,7 +110,25 @@ export class AlertsService {
   }
 
   async create(input: CreateAlertInput): Promise<Alert> {
-    return this.prisma.alert.create({ data: input });
+    let tenantId = input.tenantId;
+    if (!tenantId) {
+      const ch = await this.prisma.channel.findUnique({
+        where: { id: input.channelId },
+        select: { tenantId: true },
+      });
+      if (!ch) throw new NotFoundException('Channel not found');
+      tenantId = ch.tenantId;
+    }
+    return this.prisma.alert.create({
+      data: {
+        tenantId,
+        channelId: input.channelId,
+        type: input.type,
+        severity: input.severity,
+        message: input.message,
+        metadata: input.metadata,
+      },
+    });
   }
 
   /**

@@ -160,7 +160,7 @@ export class YouTubeQuotaService {
           status: 'ACTIVE',
           deletedAt: null,
         },
-        select: { id: true },
+        select: { id: true, tenantId: true },
         take: 50,
       });
       const message = `YouTube quota gần hết: ${used}/${YT_QUOTA_LIMIT} (${Math.round((used / YT_QUOTA_LIMIT) * 100)}%) — sync sẽ tạm dừng đến 0:00 PT ngày mai`;
@@ -168,6 +168,7 @@ export class YouTubeQuotaService {
         channels.map((c) =>
           this.prisma.alert.create({
             data: {
+              tenantId: c.tenantId,
               channelId: c.id,
               type: AlertType.RATE_LIMIT,
               severity: AlertSeverity.CRITICAL,

@@ -18,6 +18,19 @@ datasource db {
 // ENUMS
 // =============================================================================
 
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
 enum UserStatus {
   ACTIVE
   SUSPENDED
@@ -155,10 +168,37 @@ enum SyncStatus {
 // MODELS
 // =============================================================================
 
+// --- 0. Tenant -------------------------------------------------------------
+// Root entity của hệ thống multi-tenant. Mọi data nghiệp vụ scope theo tenantId.
+// Subdomain routing optional (Day 4+) — Day 3 chỉ resolve qua JWT.
+model Tenant {
+  id               String           @id @default(cuid())
+  name             String
+  slug             String           @unique // dùng cho subdomain + routing sau này
+  logoUrl          String?
+  settings         Json? // timezone, currency, language, custom branding
+  subscriptionTier SubscriptionTier @default(FREE)
+  maxEmployees     Int              @default(10)
+  maxChannels      Int              @default(20)
+  status           TenantStatus     @default(ACTIVE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  users     User[]
+  groups    Group[]
+  channels  Channel[]
+  analytics Analytics[]
+  alerts    Alert[]
+
+  @@index([slug])
+  @@index([status])
+}
+
 // --- 1. User ---------------------------------------------------------------
 model User {
   id        String     @id @default(cuid())
-  email     String     @unique
+  tenantId  String
+  email     String
   password  String // bcrypt hash (xem CLAUDE.md §9 rule #1)
   name      String
   avatar    String?
@@ -167,23 +207,23 @@ model User {
   updatedAt DateTime   @updatedAt
   deletedAt DateTime?
 
-  groupMembers       GroupMember[]
-  channelOwnerships  ChannelOwnership[] @relation("ChannelOwnerships")
-// V1-REMOVED   authoredPosts      Post[]           @relation("PostAuthor")
-  devices            UserDevice[]
+  tenant               Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groupMembers         GroupMember[]
+  channelOwnerships    ChannelOwnership[]        @relation("ChannelOwnerships")
+  devices              UserDevice[]
   notificationSettings UserNotificationSettings?
-// V1-REMOVED   authoredCrossPosts CrossPostGroup[] @relation("CrossPostGroupAuthor")
-// V1-REMOVED   assignedTasks Task[]         @relation("TaskAssignee")
-// V1-REMOVED   createdTasks  Task[]         @relation("TaskAssigner")
-// V1-REMOVED   uploads       MediaLibrary[] @relation("MediaUploader")
 
-  @@index([status])
-  @@index([deletedAt])
+  // Email unique trong scope tenant (không global)
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
 }
 
 // --- 2. Group --------------------------------------------------------------
 model Group {
   id          String    @id @default(cuid())
+  tenantId    String
   name        String
   type        GroupType
   description String?
@@ -191,11 +231,13 @@ model Group {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  members         GroupMember[]
-  channels        ChannelGroup[]
-// V1-REMOVED   crossPostGroups CrossPostGroup[] @relation("CrossPostGroupOrg")
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members  GroupMember[]
+  channels ChannelGroup[]
 
-  @@index([type])
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, type])
   @@index([deletedAt])
 }
 
@@ -246,6 +288,7 @@ model RolePermission {
 // --- 6. Channel ------------------------------------------------------------
 model Channel {
   id             String        @id @default(cuid())
+  tenantId       String
   name           String
   platform       Platform
   accountId      String // ID thật tại platform (channelId/pageId/igUserId/chatId/...)
@@ -266,17 +309,20 @@ model Channel {
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   analytics  Analytics[]
   alerts     Alert[]
   groups     ChannelGroup[]
   ownerships ChannelOwnership[]
 
-  @@unique([platform, accountId])
-  @@index([platform])
-  @@index([status])
+  // accountId+platform unique trong scope tenant (cho phép 2 tenants connect cùng 1 kênh thật)
+  @@unique([tenantId, platform, accountId])
+  @@index([tenantId])
+  @@index([tenantId, platform])
+  @@index([tenantId, status])
   @@index([platform, status])
-  @@index([tokenExpiresAt]) // Cron "tìm kênh sắp hết token"
-  @@index([syncPriority, lastSyncedAt]) // Cron analytics: stale-first theo priority
+  @@index([tokenExpiresAt])
+  @@index([syncPriority, lastSyncedAt])
   @@index([deletedAt])
 }
 
@@ -384,8 +430,10 @@ model ChannelGroup {
 
 // --- 10. Analytics ---------------------------------------------------------
 // Snapshot số liệu hàng ngày theo channel. Unique (channelId, date) để upsert idempotent.
+// `tenantId` denormalize từ Channel — speed up tenant-scoped aggregate queries.
 model Analytics {
   id              String   @id @default(cuid())
+  tenantId        String
   channelId       String
   date            DateTime @db.Date
   platform        Platform
@@ -397,22 +445,26 @@ model Analytics {
   engagementRate  Float    @default(0)
   impressions     Int      @default(0)
   clicks          Int      @default(0)
-  raw             Json? // Payload gốc từ platform để debug/mở rộng metrics sau này
+  raw             Json?
   fetchedAt       DateTime @default(now())
 
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@unique([channelId, date])
+  @@index([tenantId])
+  @@index([tenantId, date])
   @@index([channelId])
   @@index([date])
   @@index([platform])
   @@index([platform, date])
-  @@index([channelId, date(sort: Desc)]) // Biểu đồ timeseries mới nhất
+  @@index([channelId, date(sort: Desc)])
 }
 
 // --- 11. Alert -------------------------------------------------------------
 model Alert {
   id        String        @id @default(cuid())
+  tenantId  String
   channelId String
   type      AlertType
   message   String
@@ -422,15 +474,18 @@ model Alert {
   createdAt DateTime      @default(now())
   readAt    DateTime?
 
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId])
+  @@index([tenantId, isRead])
   @@index([channelId])
   @@index([isRead])
   @@index([severity])
   @@index([type])
   @@index([createdAt])
-  @@index([channelId, isRead]) // Badge "kênh X có N alert chưa đọc"
-  @@index([severity, isRead]) // Dashboard: CRITICAL chưa đọc
+  @@index([channelId, isRead])
+  @@index([severity, isRead])
 }
 
 // V1-REMOVED // --- 12. MediaLibrary ------------------------------------------------------

@@ -90,6 +90,7 @@ export class TelegramService extends BasePlatformService {
     await this.prisma.analytics.upsert({
       where: { channelId_date: { channelId, date: today } },
       create: {
+        tenantId: channel.tenantId,
         channelId,
         date: today,
         platform: Platform.TELEGRAM,

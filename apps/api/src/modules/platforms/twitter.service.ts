@@ -199,6 +199,7 @@ export class TwitterService extends BasePlatformService {
       await this.prisma.analytics.upsert({
         where: { channelId_date: { channelId, date: new Date(dateKey) } },
         create: {
+          tenantId: channel.tenantId,
           channelId,
           date: new Date(dateKey),
           platform: Platform.X,

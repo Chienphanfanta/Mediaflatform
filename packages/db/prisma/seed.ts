@@ -126,6 +126,32 @@ async function cleanup() {
   await prisma.permission.deleteMany();
   await prisma.group.deleteMany();
   await prisma.user.deleteMany();
+  // Tenant cuối — cascade FK đảm bảo các bảng trên đã sạch
+  await prisma.tenant.deleteMany();
+}
+
+// =============================================================================
+// 0. TENANT (V2 multi-tenant root)
+// =============================================================================
+
+const DEFAULT_TENANT_ID = 'tenant_default_v2';
+
+async function seedDefaultTenant() {
+  console.log('🏠 Seed default tenant...');
+  const tenant = await prisma.tenant.upsert({
+    where: { id: DEFAULT_TENANT_ID },
+    update: {},
+    create: {
+      id: DEFAULT_TENANT_ID,
+      name: 'Mediaflatform Internal',
+      slug: 'default',
+      subscriptionTier: 'ENTERPRISE',
+      maxEmployees: 100,
+      maxChannels: 100,
+      status: 'ACTIVE',
+    },
+  });
+  return tenant;
 }
 
 // =============================================================================
@@ -171,11 +197,12 @@ async function seedPermissions() {
 // 2. GROUPS
 // =============================================================================
 
-async function seedGroups() {
+async function seedGroups(tenantId: string) {
   console.log('🏢 Seed groups...');
 
   const systemGroup = await prisma.group.create({
     data: {
+      tenantId,
       name: 'System',
       type: GroupType.SYSTEM,
       description: 'Nhóm hệ thống — SuperAdmin nằm ở đây',
@@ -184,6 +211,7 @@ async function seedGroups() {
 
   const hrGroup = await prisma.group.create({
     data: {
+      tenantId,
       name: 'HR Group',
       type: GroupType.HR,
       description: 'Nhóm nhân sự — tuyển dụng, onboarding, quản lý user',
@@ -192,6 +220,7 @@ async function seedGroups() {
 
   const contentGroup = await prisma.group.create({
     data: {
+      tenantId,
       name: 'Content Group',
       type: GroupType.CONTENT,
       description: 'Nhóm sản xuất nội dung trên tất cả kênh truyền thông',
@@ -200,6 +229,7 @@ async function seedGroups() {
 
   const analyticsGroup = await prisma.group.create({
     data: {
+      tenantId,
       name: 'Analytics Group',
       type: GroupType.ANALYTICS,
       description: 'Nhóm phân tích số liệu, báo cáo hiệu quả kênh',
@@ -213,7 +243,7 @@ async function seedGroups() {
 // 3. USERS + GROUP MEMBERS
 // =============================================================================
 
-async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
+async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof seedGroups>>) {
   console.log('👥 Seed users...');
 
   const superAdminPass = await hash(SUPERADMIN_PASSWORD);
@@ -222,6 +252,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
   // --- SuperAdmin ---
   const superAdmin = await prisma.user.create({
     data: {
+      tenantId,
       email: SUPERADMIN_EMAIL,
       password: superAdminPass,
       name: 'Super Admin',
@@ -236,6 +267,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
   // --- 5 regular users ---
   const hrAdmin = await prisma.user.create({
     data: {
+      tenantId,
       email: 'hr.admin@company.com',
       password: userPass,
       name: faker.person.fullName({ sex: 'female' }),
@@ -249,6 +281,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
 
   const contentManager = await prisma.user.create({
     data: {
+      tenantId,
       email: 'content.manager@company.com',
       password: userPass,
       name: faker.person.fullName({ sex: 'male' }),
@@ -262,6 +295,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
 
   const contentStaff1 = await prisma.user.create({
     data: {
+      tenantId,
       email: 'content.staff1@company.com',
       password: userPass,
       name: faker.person.fullName(),
@@ -275,6 +309,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
 
   const contentStaff2 = await prisma.user.create({
     data: {
+      tenantId,
       email: 'content.staff2@company.com',
       password: userPass,
       name: faker.person.fullName(),
@@ -288,6 +323,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
 
   const analyst = await prisma.user.create({
     data: {
+      tenantId,
       email: 'analyst@company.com',
       password: userPass,
       name: faker.person.fullName(),
@@ -307,6 +343,7 @@ async function seedUsers(groups: Awaited<ReturnType<typeof seedGroups>>) {
 // =============================================================================
 
 async function seedChannels(
+  tenantId: string,
   users: Awaited<ReturnType<typeof seedUsers>>,
   groups: Awaited<ReturnType<typeof seedGroups>>,
 ) {
@@ -315,6 +352,7 @@ async function seedChannels(
   // --- 1. YouTube (PRIMARY: contentManager, SECONDARY: contentStaff1) ---
   const youtube = await prisma.channel.create({
     data: {
+      tenantId,
       name: 'Company Official YouTube',
       platform: Platform.YOUTUBE,
       accountId: 'UC' + faker.string.alphanumeric(22),
@@ -357,6 +395,7 @@ async function seedChannels(
   // --- 2. Facebook (PRIMARY: contentStaff2) ---
   const facebook = await prisma.channel.create({
     data: {
+      tenantId,
       name: 'Company Facebook Page',
       platform: Platform.FACEBOOK,
       accountId: faker.string.numeric(15),
@@ -387,6 +426,7 @@ async function seedChannels(
   // --- 3. Instagram (PRIMARY: contentManager, SECONDARY: analyst) ---
   const instagram = await prisma.channel.create({
     data: {
+      tenantId,
       name: 'Company Instagram',
       platform: Platform.INSTAGRAM,
       accountId: faker.string.numeric(17),
@@ -426,6 +466,7 @@ async function seedChannels(
   // --- 4. Telegram (PRIMARY: contentStaff1) ---
   const telegram = await prisma.channel.create({
     data: {
+      tenantId,
       name: 'Company Telegram Channel',
       platform: Platform.TELEGRAM,
       accountId: '-100' + faker.string.numeric(10),
@@ -454,6 +495,7 @@ async function seedChannels(
   // --- 5. WhatsApp (INACTIVE — chưa kết nối token) ---
   const whatsapp = await prisma.channel.create({
     data: {
+      tenantId,
       name: 'Company WhatsApp Business',
       platform: Platform.WHATSAPP,
       accountId: faker.string.numeric(15),
@@ -489,7 +531,10 @@ async function seedChannels(
 // 5. ANALYTICS (30 ngày cho mỗi channel)
 // =============================================================================
 
-async function seedAnalytics(channels: Awaited<ReturnType<typeof seedChannels>>) {
+async function seedAnalytics(
+  tenantId: string,
+  channels: Awaited<ReturnType<typeof seedChannels>>,
+) {
   console.log('📊 Seed analytics (30 ngày × 4 kênh active)...');
 
   const rows: Prisma.AnalyticsCreateManyInput[] = [];
@@ -510,6 +555,7 @@ async function seedAnalytics(channels: Awaited<ReturnType<typeof seedChannels>>)
       runningSubs += delta;
 
       rows.push({
+        tenantId,
         channelId: ch.id,
         date,
         platform: ch.platform,
@@ -538,12 +584,16 @@ async function seedAnalytics(channels: Awaited<ReturnType<typeof seedChannels>>)
 // 8. ALERTS (vài cảnh báo mẫu)
 // =============================================================================
 
-async function seedAlerts(channels: Awaited<ReturnType<typeof seedChannels>>) {
+async function seedAlerts(
+  tenantId: string,
+  channels: Awaited<ReturnType<typeof seedChannels>>,
+) {
   console.log('🚨 Seed alerts...');
 
   await prisma.alert.createMany({
     data: [
       {
+        tenantId,
         channelId: channels.youtube.id,
         type: AlertType.VIEW_DROP,
         severity: AlertSeverity.MEDIUM,
@@ -552,6 +602,7 @@ async function seedAlerts(channels: Awaited<ReturnType<typeof seedChannels>>) {
         metadata: { dropPercent: 35, comparedDays: 7 },
       },
       {
+        tenantId,
         channelId: channels.facebook.id,
         type: AlertType.TOKEN_EXPIRING,
         severity: AlertSeverity.MEDIUM,
@@ -560,6 +611,7 @@ async function seedAlerts(channels: Awaited<ReturnType<typeof seedChannels>>) {
         metadata: { daysRemaining: 5 },
       },
       {
+        tenantId,
         channelId: channels.instagram.id,
         type: AlertType.API_ERROR,
         severity: AlertSeverity.CRITICAL,
@@ -580,16 +632,18 @@ async function main() {
   console.log('🌱 Bắt đầu seed Media Ops Platform...\n');
 
   await cleanup();
+  const tenant = await seedDefaultTenant();
   const permResult = await seedPermissions();
-  const groups = await seedGroups();
-  const users = await seedUsers(groups);
-  const channels = await seedChannels(users, groups);
+  const groups = await seedGroups(tenant.id);
+  const users = await seedUsers(tenant.id, groups);
+  const channels = await seedChannels(tenant.id, users, groups);
   // V2 stripped: seedPosts + seedTasks (Post + Task entities bỏ).
-  const analyticsCount = await seedAnalytics(channels);
-  await seedAlerts(channels);
+  const analyticsCount = await seedAnalytics(tenant.id, channels);
+  await seedAlerts(tenant.id, channels);
 
   console.log('\n✅ Seed hoàn tất!');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`  Tenant                : ${tenant.name} (slug=${tenant.slug})`);
   console.log(`  Permissions           : ${permResult.permissionsCount}`);
   console.log(`  Role-permission rows  : ${permResult.rolePermsCount}`);
   console.log(`  Groups                : 4 (SYSTEM + HR + Content + Analytics)`);

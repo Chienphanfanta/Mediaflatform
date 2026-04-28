@@ -59,12 +59,14 @@ export const POST = withAuth(
 
     const channel = await prisma.channel.upsert({
       where: {
-        platform_accountId: {
+        tenantId_platform_accountId: {
+          tenantId: user.tenantId,
           platform: 'TELEGRAM',
           accountId: tokenSet.account.externalId,
         },
       },
       create: {
+        tenantId: user.tenantId,
         name: tokenSet.account.name,
         platform: 'TELEGRAM',
         accountId: tokenSet.account.externalId,

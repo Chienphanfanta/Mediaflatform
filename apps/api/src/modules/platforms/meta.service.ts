@@ -55,6 +55,7 @@ const IG_INSIGHTS_LOOKBACK_DAYS = 30;
 
 const CHANNEL_SELECT = {
   id: true,
+  tenantId: true,
   platform: true,
   accountId: true,
   accessToken: true,
@@ -158,6 +159,7 @@ export class MetaService {
       await this.prisma.analytics.upsert({
         where: { channelId_date: { channelId, date: new Date(dateKey) } },
         create: {
+          tenantId: channel.tenantId,
           channelId,
           date: new Date(dateKey),
           platform: Platform.FACEBOOK,
@@ -316,6 +318,7 @@ export class MetaService {
       await this.prisma.analytics.upsert({
         where: { channelId_date: { channelId, date: new Date(dateKey) } },
         create: {
+          tenantId: channel.tenantId,
           channelId,
           date: new Date(dateKey),
           platform: Platform.INSTAGRAM,

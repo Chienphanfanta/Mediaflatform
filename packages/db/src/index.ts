@@ -1,3 +1,6 @@
-// Export Prisma client singleton - các app khác import từ đây
-// import { prisma } from '@media-ops/db'
+// @media-ops/db — barrel export
+//   - Re-export Prisma types/client
+//   - Tenant isolation: AsyncLocalStorage context + Prisma extension
 export * from '@prisma/client';
+export * from './tenant-context';
+export * from './tenant-extension';

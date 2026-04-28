@@ -68,6 +68,8 @@ export default {
       // Chỉ set 1 lần khi login (user object có)
       if (user) {
         token.id = (user.id ?? token.sub) as string;
+        token.tenantId = (user.tenantId ?? '') as string;
+        token.tenantSlug = (user.tenantSlug ?? '') as string;
         token.groups = user.groups ?? [];
         token.permissions = user.permissions ?? {};
         token.isSuperAdmin = user.isSuperAdmin ?? false;
@@ -77,6 +79,8 @@ export default {
 
     async session({ session, token }) {
       session.user.id = token.id;
+      session.user.tenantId = token.tenantId;
+      session.user.tenantSlug = token.tenantSlug;
       session.user.groups = token.groups;
       session.user.permissions = token.permissions;
       session.user.isSuperAdmin = token.isSuperAdmin;

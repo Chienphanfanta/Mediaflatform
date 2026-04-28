@@ -218,6 +218,7 @@ export const POST = withAuth(
 
     const created = await prisma.channel.create({
       data: {
+        tenantId: user.tenantId,
         name: parsed.data.name,
         platform: parsed.data.platform,
         accountId: parsed.data.accountId,
