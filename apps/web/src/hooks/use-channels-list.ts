@@ -8,7 +8,7 @@ export function useChannelsList() {
   return useQuery<ChannelListItemFull[], Error>({
     queryKey: ['channels-list', 'with-stats'],
     queryFn: () => apiFetch<ChannelListItemFull[]>('/api/v1/channels?stats=1'),
-    staleTime: 30_000,
+    staleTime: 120_000, // 2 phút (V2 spec)
   });
 }
 
@@ -48,6 +48,51 @@ export function useDeleteChannel() {
     mutationFn: (channelId) =>
       apiFetch<void>(`/api/v1/channels/${channelId}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['channels-list'] }),
+  });
+}
+
+export type CreateChannelPayload = {
+  name: string;
+  platform: string;
+  accountId: string;
+  externalUrl?: string | null;
+  description?: string | null;
+  category?: string | null;
+  groupIds?: string[];
+  primaryOwnerId?: string;
+};
+
+export function useCreateChannel() {
+  const qc = useQueryClient();
+  return useMutation<
+    { id: string; name: string; platform: string; status: string },
+    Error,
+    CreateChannelPayload
+  >({
+    mutationFn: (input) =>
+      apiFetch(`/api/v1/channels`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['channels-list'] }),
+  });
+}
+
+export function useArchiveChannel() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; status: string }, Error, string>({
+    mutationFn: (channelId) =>
+      apiFetch<{ id: string; status: string }>(
+        `/api/v1/channels/${channelId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ status: 'ARCHIVED' }),
+        },
+      ),
+    onSuccess: (_data, channelId) => {
+      qc.invalidateQueries({ queryKey: ['channels-list'] });
+      qc.invalidateQueries({ queryKey: ['channel', channelId] });
+    },
   });
 }
 

@@ -8,12 +8,23 @@ export type ChannelMonthStats = {
   engagementRate: number;
 };
 
+export type ChannelOwnershipBrief = {
+  role: 'PRIMARY' | 'SECONDARY';
+  employeeId: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+};
+
 export type ChannelListItemFull = {
   id: string;
   name: string;
   platform: Platform;
   status: ChannelStatus;
   accountId: string;
+  externalUrl: string | null;
+  description: string | null;
+  category: string | null;
   tokenExpiresAt: string | null;
   groupIds: string[];
   groupNames: string[];
@@ -21,6 +32,8 @@ export type ChannelListItemFull = {
   thumbnailUrl: string | null;
   subscriberCount: number | null;
   lastSyncedAt: string | null;
+  lastSyncError: string | null;
+  ownerships: ChannelOwnershipBrief[];
   monthStats: ChannelMonthStats;
 };
 

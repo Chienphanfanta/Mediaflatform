@@ -8,7 +8,6 @@ import {
   PanelRightOpen,
   Tv,
 } from 'lucide-react';
-import type { Platform } from '@prisma/client';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -24,33 +23,34 @@ import {
 } from '@/hooks/use-channels-list';
 import { useSyncStatus } from '@/hooks/use-sync-status';
 import { ChannelCard } from '@/components/channels/channel-card';
+import { ChannelListRow } from '@/components/channels/channel-list-row';
 import {
   ChannelFiltersBar,
   type ChannelFilters,
+  type ChannelView,
 } from '@/components/channels/channel-filters';
-import { ConnectChannelDialog } from '@/components/channels/connect-channel-dialog';
+import { AddChannelDialog } from '@/components/channels/add-channel-dialog';
 import { SyncStatusPanel } from '@/components/channels/sync-status-panel';
 import type { ChannelListItemFull } from '@/lib/types/channels-page';
 
-export default function ChannelsPage() {
-  const { atLeast, user } = usePermission();
-  const userGroups = user?.groups ?? [];
+const DEFAULT_FILTERS: ChannelFilters = {
+  platforms: [],
+  category: 'all',
+  primaryOwnerId: 'all',
+  status: 'all',
+  query: '',
+};
 
-  const [filters, setFilters] = useState<ChannelFilters>({
-    platform: 'all',
-    groupId: 'all',
-    query: '',
-  });
+export default function ChannelsPage() {
+  const { atLeast } = usePermission();
+
+  const [filters, setFilters] = useState<ChannelFilters>(DEFAULT_FILTERS);
+  const [view, setView] = useState<ChannelView>('grid');
   const [panelOpen, setPanelOpen] = useState(true);
   const [connectOpen, setConnectOpen] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
-  const {
-    data: channels,
-    isLoading,
-    isError,
-    error,
-  } = useChannelsList();
+  const { data: channels, isLoading, isError, error } = useChannelsList();
   const {
     data: syncStatus,
     isLoading: statusLoading,
@@ -62,31 +62,57 @@ export default function ChannelsPage() {
   const disconnect = useDisconnectChannel();
   const remove = useDeleteChannel();
 
-  const groupOptions = useMemo(() => {
+  // Build filter dropdown options từ data hiện có
+  const categories = useMemo(() => {
     if (!channels) return [];
-    const counts = new Map<string, number>();
+    const set = new Set<string>();
     for (const c of channels) {
-      for (const gid of c.groupIds) counts.set(gid, (counts.get(gid) ?? 0) + 1);
+      if (c.category) set.add(c.category);
     }
-    return userGroups.map((g) => ({
-      id: g.id,
-      name: g.name,
-      count: counts.get(g.id) ?? 0,
-    }));
-  }, [channels, userGroups]);
+    return Array.from(set).sort();
+  }, [channels]);
+
+  const primaryOwners = useMemo(() => {
+    if (!channels) return [];
+    const map = new Map<string, string>();
+    for (const c of channels) {
+      const primary = c.ownerships.find((o) => o.role === 'PRIMARY');
+      if (primary) map.set(primary.employeeId, primary.name);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [channels]);
 
   const filtered = useMemo(() => {
     if (!channels) return [];
+    const q = filters.query.trim().toLowerCase();
     return channels.filter((c) => {
-      if (filters.platform !== 'all' && c.platform !== filters.platform) return false;
-      if (filters.groupId !== 'all' && !c.groupIds.includes(filters.groupId)) {
+      if (filters.platforms.length > 0 && !filters.platforms.includes(c.platform)) {
         return false;
       }
-      if (
-        filters.query &&
-        !c.name.toLowerCase().includes(filters.query.toLowerCase())
-      ) {
+      if (filters.category !== 'all' && c.category !== filters.category) {
         return false;
+      }
+      if (filters.status !== 'all' && c.status !== filters.status) {
+        return false;
+      }
+      if (filters.primaryOwnerId !== 'all') {
+        const primary = c.ownerships.find((o) => o.role === 'PRIMARY');
+        if (!primary || primary.employeeId !== filters.primaryOwnerId) {
+          return false;
+        }
+      }
+      if (q) {
+        const haystack = [
+          c.name,
+          c.externalUrl ?? '',
+          c.accountId,
+          c.description ?? '',
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
       return true;
     });
@@ -100,9 +126,7 @@ export default function ChannelsPage() {
 
   const handleSync = (id: string) => {
     setSyncingId(id);
-    syncOne.mutate(id, {
-      onSettled: () => setSyncingId(null),
-    });
+    syncOne.mutate(id, { onSettled: () => setSyncingId(null) });
   };
 
   const handleDisconnect = (channel: ChannelListItemFull) => {
@@ -145,6 +169,7 @@ export default function ChannelsPage() {
             variant="outline"
             size="icon"
             onClick={() => setPanelOpen((o) => !o)}
+            aria-label={panelOpen ? 'Ẩn sync panel' : 'Mở sync panel'}
             title={panelOpen ? 'Ẩn panel' : 'Mở panel'}
           >
             {panelOpen ? (
@@ -156,7 +181,7 @@ export default function ChannelsPage() {
           {atLeast('MANAGER') && (
             <Button onClick={() => setConnectOpen(true)}>
               <Plus className="h-4 w-4" />
-              Kết nối kênh mới
+              Thêm kênh mới
             </Button>
           )}
         </div>
@@ -171,28 +196,38 @@ export default function ChannelsPage() {
       )}
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Main content */}
         <div className="min-w-0 flex-1 space-y-4">
           <ChannelFiltersBar
             filters={filters}
             onChange={setFilters}
-            groups={groupOptions}
+            view={view}
+            onViewChange={setView}
+            categories={categories}
+            primaryOwners={primaryOwners}
             totalCount={channels?.length ?? 0}
           />
 
           {isLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-72 w-full rounded-lg" />
-              ))}
-            </div>
+            view === 'grid' ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-72 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-md" />
+                ))}
+              </div>
+            )
           ) : filtered.length === 0 ? (
             <EmptyState
               hasChannels={(channels?.length ?? 0) > 0}
               canConnect={atLeast('MANAGER')}
               onConnect={() => setConnectOpen(true)}
             />
-          ) : (
+          ) : view === 'grid' ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((c) => (
                 <ChannelCard
@@ -206,10 +241,41 @@ export default function ChannelsPage() {
                 />
               ))}
             </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border bg-card">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Kênh</th>
+                    <th className="px-3 py-2 font-medium">Platform</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">PRIMARY owner</th>
+                    <th className="px-3 py-2 font-medium">Category</th>
+                    <th className="px-3 py-2 text-right font-medium">Followers</th>
+                    <th className="px-3 py-2 text-right font-medium">Last sync</th>
+                    <th className="w-10 px-3 py-2">
+                      <span className="sr-only">Hành động</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filtered.map((c) => (
+                    <ChannelListRow
+                      key={c.id}
+                      channel={c}
+                      inProgress={!!inProgressMap.get(c.id)}
+                      onSync={handleSync}
+                      onDisconnect={handleDisconnect}
+                      onDelete={handleDelete}
+                      syncPending={syncingId === c.id && syncOne.isPending}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
-        {/* Right panel */}
         {panelOpen && (
           <aside className="w-full lg:w-80 lg:shrink-0">
             <SyncStatusPanel
@@ -224,7 +290,7 @@ export default function ChannelsPage() {
         )}
       </div>
 
-      <ConnectChannelDialog
+      <AddChannelDialog
         open={connectOpen}
         onClose={() => setConnectOpen(false)}
       />
@@ -263,7 +329,7 @@ function EmptyState({
             {canConnect && (
               <Button className="mt-2" onClick={onConnect}>
                 <Plus className="h-4 w-4" />
-                Kết nối kênh mới
+                Thêm kênh mới
               </Button>
             )}
           </>
