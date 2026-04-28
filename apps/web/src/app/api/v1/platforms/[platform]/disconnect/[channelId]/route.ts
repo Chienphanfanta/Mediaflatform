@@ -60,7 +60,7 @@ export const POST = withAuth<{ platform: string; channelId: string }>(
     await prisma.channel.update({
       where: { id: channel.id },
       data: {
-        status: 'DISCONNECTED',
+        status: 'INACTIVE',
         accessToken: null,
         refreshToken: null,
         tokenExpiresAt: null,

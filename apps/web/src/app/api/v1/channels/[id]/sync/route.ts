@@ -29,10 +29,10 @@ export const POST = withAuth<{ id: string }>(
     if (!canSync) {
       return fail('FORBIDDEN', 'Không có quyền sync kênh này', { status: 403 });
     }
-    if (channel.status === 'TOKEN_EXPIRED' || !channel.accessToken) {
+    if (channel.status === 'INACTIVE' || !channel.accessToken) {
       return fail(
-        'TOKEN_EXPIRED',
-        'Token đã hết hạn — reconnect kênh trước khi sync',
+        'CHANNEL_INACTIVE',
+        'Kênh đang INACTIVE (token expired/disconnected) — reconnect trước khi sync',
         { status: 409 },
       );
     }

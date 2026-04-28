@@ -26,11 +26,9 @@ function healthFromStatus(s: ChannelStatus): ChannelHealthItem['health'] {
   switch (s) {
     case 'ACTIVE':
       return 'green';
-    case 'TOKEN_EXPIRED':
-    case 'SUSPENDED':
+    case 'INACTIVE':
       return 'yellow';
-    case 'DISCONNECTED':
-    case 'ERROR':
+    case 'ARCHIVED':
     default:
       return 'red';
   }

@@ -78,8 +78,14 @@ export const POST = withAuth(
           connectedAt: new Date().toISOString(),
           connectedBy: user.id,
         } as Prisma.InputJsonValue,
-        ownerId: user.id,
         groups: { create: { groupId } },
+        ownerships: {
+          create: {
+            employeeId: user.id,
+            role: 'PRIMARY',
+            assignedById: user.id,
+          },
+        },
       },
       update: {
         name: tokenSet.account.name,

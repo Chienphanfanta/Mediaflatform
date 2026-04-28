@@ -23,7 +23,6 @@ export const CHANNEL_SELECT = {
   id: true,
   platform: true,
   accountId: true,
-  ownerId: true,
   accessToken: true,
   refreshToken: true,
   tokenExpiresAt: true,

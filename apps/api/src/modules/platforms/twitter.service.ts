@@ -419,7 +419,7 @@ export class TwitterService extends BasePlatformService {
     await this.prisma.channel
       .update({
         where: { id: channelId },
-        data: { status: ChannelStatus.TOKEN_EXPIRED },
+        data: { status: ChannelStatus.INACTIVE, lastSyncError: 'TOKEN_EXPIRED' },
       })
       .catch(() => {});
   }

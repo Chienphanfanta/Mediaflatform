@@ -52,8 +52,12 @@ export class NotificationService {
             id: true,
             name: true,
             platform: true,
-            ownerId: true,
-            owner: { select: { id: true, name: true, email: true } },
+            ownerships: {
+              where: { role: 'PRIMARY' },
+              select: {
+                employee: { select: { id: true, name: true, email: true, status: true } },
+              },
+            },
             groups: {
               select: {
                 groupId: true,
@@ -95,8 +99,14 @@ export class NotificationService {
       string,
       { id: string; name: string; email: string }
     >();
-    if (alert.channel.owner) {
-      recipientMap.set(alert.channel.owner.id, alert.channel.owner);
+    for (const o of alert.channel.ownerships) {
+      if (o.employee.status === 'ACTIVE') {
+        recipientMap.set(o.employee.id, {
+          id: o.employee.id,
+          name: o.employee.name,
+          email: o.employee.email,
+        });
+      }
     }
     for (const cg of alert.channel.groups) {
       for (const m of cg.group.members) {

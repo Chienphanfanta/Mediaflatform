@@ -46,18 +46,18 @@ export const GET = withAuth<{ platform: string; channelId: string }>(
       });
     }
 
-    // Token đã hết hạn (theo DB) → mark TOKEN_EXPIRED, không cần gọi API
+    // Token đã hết hạn (theo DB) → mark INACTIVE + lastSyncError
     if (channel.tokenExpiresAt && channel.tokenExpiresAt.getTime() < Date.now()) {
-      if (channel.status !== 'TOKEN_EXPIRED') {
+      if (channel.status !== 'INACTIVE') {
         await prisma.channel.update({
           where: { id: channel.id },
-          data: { status: 'TOKEN_EXPIRED' },
+          data: { status: 'INACTIVE', lastSyncError: 'TOKEN_EXPIRED' },
         });
       }
       return ok({
         valid: false,
         reason: 'Token đã hết hạn (theo `tokenExpiresAt`)',
-        currentStatus: 'TOKEN_EXPIRED',
+        currentStatus: 'INACTIVE',
       });
     }
 
@@ -75,12 +75,15 @@ export const GET = withAuth<{ platform: string; channelId: string }>(
     const adapter = getAdapter(platform);
     const result = await adapter.verifyToken(plaintext);
 
-    // Update Channel.status theo kết quả verify
-    const nextStatus = result.valid ? 'ACTIVE' : 'ERROR';
+    // Update Channel.status theo kết quả verify (V2: ACTIVE | INACTIVE | ARCHIVED)
+    const nextStatus = result.valid ? 'ACTIVE' : 'INACTIVE';
     if (channel.status !== nextStatus) {
       await prisma.channel.update({
         where: { id: channel.id },
-        data: { status: nextStatus },
+        data: {
+          status: nextStatus,
+          lastSyncError: result.valid ? null : result.reason ?? 'VERIFY_FAILED',
+        },
       });
     }
 

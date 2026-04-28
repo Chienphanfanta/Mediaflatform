@@ -59,10 +59,13 @@ enum Platform {
 
 enum ChannelStatus {
   ACTIVE
-  TOKEN_EXPIRED
-  DISCONNECTED
-  ERROR
-  SUSPENDED
+  INACTIVE
+  ARCHIVED
+}
+
+enum OwnershipRole {
+  PRIMARY
+  SECONDARY
 }
 
 // V1-REMOVED enum PostStatus {
@@ -165,7 +168,7 @@ model User {
   deletedAt DateTime?
 
   groupMembers       GroupMember[]
-  ownedChannels      Channel[]        @relation("ChannelOwner")
+  channelOwnerships  ChannelOwnership[] @relation("ChannelOwnerships")
 // V1-REMOVED   authoredPosts      Post[]           @relation("PostAuthor")
   devices            UserDevice[]
   notificationSettings UserNotificationSettings?
@@ -246,37 +249,55 @@ model Channel {
   name           String
   platform       Platform
   accountId      String // ID thật tại platform (channelId/pageId/igUserId/chatId/...)
+  externalUrl    String? // Link công khai đến kênh
+  description    String?
+  category       String? // "Thời sự", "Giải trí", "Lifestyle"
   accessToken    String? // AES-256-GCM encrypted (TOKEN_ENCRYPTION_KEY)
   refreshToken   String? // AES-256-GCM encrypted
   tokenExpiresAt DateTime?
   status         ChannelStatus @default(ACTIVE)
   metadata       Json? // Fields riêng theo platform — xem CLAUDE.md §6
-  ownerId        String
   /// Lần sync analytics gần nhất. Cron analytics scan theo `syncPriority + lastSyncedAt`
   /// để pick stale-first (xem AnalyticsCronService.smartSync).
   lastSyncedAt   DateTime?
-  /// Tự cập nhật bởi SyncPriorityService dựa vào: posts published 24h gần nhất,
-  /// active vs inactive >7 ngày.
+  lastSyncError  String? // Mô tả lỗi sync gần nhất (null = OK)
   syncPriority   SyncPriority  @default(NORMAL)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
-  owner     User           @relation("ChannelOwner", fields: [ownerId], references: [id])
-// V1-REMOVED   posts     Post[]
-  analytics Analytics[]
-  alerts    Alert[]
-  groups    ChannelGroup[]
-// V1-REMOVED   tasks     Task[]
+  analytics  Analytics[]
+  alerts     Alert[]
+  groups     ChannelGroup[]
+  ownerships ChannelOwnership[]
 
   @@unique([platform, accountId])
-  @@index([ownerId])
   @@index([platform])
   @@index([status])
   @@index([platform, status])
   @@index([tokenExpiresAt]) // Cron "tìm kênh sắp hết token"
   @@index([syncPriority, lastSyncedAt]) // Cron analytics: stale-first theo priority
   @@index([deletedAt])
+}
+
+// --- 6.1. ChannelOwnership ------------------------------------------------
+// Junction Channel ↔ User: ai phụ trách kênh nào.
+// PRIMARY (1 người chính/channel) | SECONDARY (nhiều người hỗ trợ).
+model ChannelOwnership {
+  id           String        @id @default(cuid())
+  channelId    String
+  employeeId   String
+  role         OwnershipRole @default(SECONDARY)
+  assignedAt   DateTime      @default(now())
+  assignedById String? // userId của người gán (null khi seed/system)
+
+  channel  Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  employee User    @relation("ChannelOwnerships", fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, employeeId])
+  @@index([channelId])
+  @@index([employeeId])
+  @@index([channelId, role])
 }
 
 // --- 7. ChannelGroup -------------------------------------------------------

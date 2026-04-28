@@ -23,10 +23,8 @@ const HEALTH_LABEL = {
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: 'Active',
-  TOKEN_EXPIRED: 'Token hết hạn',
-  DISCONNECTED: 'Đã ngắt',
-  ERROR: 'Lỗi',
-  SUSPENDED: 'Tạm dừng',
+  INACTIVE: 'Inactive',
+  ARCHIVED: 'Archived',
 };
 
 export function ChannelHealth({ data, isLoading }: Props) {

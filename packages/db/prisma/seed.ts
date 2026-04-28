@@ -118,6 +118,7 @@ async function cleanup() {
   await prisma.alert.deleteMany();
   await prisma.analytics.deleteMany();
   // V1-REMOVED: task/post/mediaLibrary entities bỏ V2.
+  await prisma.channelOwnership.deleteMany();
   await prisma.channelGroup.deleteMany();
   await prisma.channel.deleteMany();
   await prisma.groupMember.deleteMany();
@@ -311,21 +312,20 @@ async function seedChannels(
 ) {
   console.log('📺 Seed channels...');
 
-  const owner = users.contentManager.id;
-
-  // --- YouTube ---
+  // --- 1. YouTube (PRIMARY: contentManager, SECONDARY: contentStaff1) ---
   const youtube = await prisma.channel.create({
     data: {
       name: 'Company Official YouTube',
       platform: Platform.YOUTUBE,
       accountId: 'UC' + faker.string.alphanumeric(22),
-      // LƯU Ý: trong production token PHẢI mã hoá AES-256-GCM trước khi ghi.
-      // Ở seed chỉ là dummy — tuyệt đối không copy pattern này vào code thật.
+      externalUrl: 'https://youtube.com/@companyofficial',
+      description: 'Kênh chính thức công ty — review sản phẩm, tin tức nội bộ',
+      category: 'Tin tức / Doanh nghiệp',
+      // LƯU Ý: production token PHẢI mã hoá AES-256-GCM. Seed chỉ dummy.
       accessToken: 'SEED_DUMMY_NOT_ENCRYPTED',
       refreshToken: 'SEED_DUMMY_NOT_ENCRYPTED',
       tokenExpiresAt: hoursFromNow(24 * 30),
       status: ChannelStatus.ACTIVE,
-      ownerId: owner,
       metadata: {
         channelId: faker.string.alphanumeric(24),
         channelHandle: '@companyofficial',
@@ -337,19 +337,35 @@ async function seedChannels(
         monetizationEnabled: true,
       },
       groups: { create: { groupId: groups.contentGroup.id } },
+      ownerships: {
+        create: [
+          {
+            employeeId: users.contentManager.id,
+            role: 'PRIMARY',
+            assignedById: users.superAdmin.id,
+          },
+          {
+            employeeId: users.contentStaff1.id,
+            role: 'SECONDARY',
+            assignedById: users.contentManager.id,
+          },
+        ],
+      },
     },
   });
 
-  // --- Facebook ---
+  // --- 2. Facebook (PRIMARY: contentStaff2) ---
   const facebook = await prisma.channel.create({
     data: {
       name: 'Company Facebook Page',
       platform: Platform.FACEBOOK,
       accountId: faker.string.numeric(15),
+      externalUrl: 'https://facebook.com/companyofficial',
+      description: 'Page chính — sự kiện, thông báo, livestream',
+      category: 'Media/News Company',
       accessToken: 'SEED_DUMMY_NOT_ENCRYPTED',
       tokenExpiresAt: hoursFromNow(24 * 60),
       status: ChannelStatus.ACTIVE,
-      ownerId: owner,
       metadata: {
         pageId: faker.string.numeric(15),
         pageName: 'Company Official',
@@ -358,19 +374,28 @@ async function seedChannels(
         verificationStatus: 'blue_verified',
       },
       groups: { create: { groupId: groups.contentGroup.id } },
+      ownerships: {
+        create: {
+          employeeId: users.contentStaff2.id,
+          role: 'PRIMARY',
+          assignedById: users.contentManager.id,
+        },
+      },
     },
   });
 
-  // --- Instagram ---
+  // --- 3. Instagram (PRIMARY: contentManager, SECONDARY: analyst) ---
   const instagram = await prisma.channel.create({
     data: {
       name: 'Company Instagram',
       platform: Platform.INSTAGRAM,
       accountId: faker.string.numeric(17),
+      externalUrl: 'https://instagram.com/companyofficial',
+      description: 'Behind-the-scenes, lifestyle content',
+      category: 'Lifestyle',
       accessToken: 'SEED_DUMMY_NOT_ENCRYPTED',
       tokenExpiresAt: hoursFromNow(24 * 60),
       status: ChannelStatus.ACTIVE,
-      ownerId: owner,
       metadata: {
         igUserId: faker.string.numeric(17),
         username: 'companyofficial',
@@ -381,10 +406,81 @@ async function seedChannels(
         mediaCount: faker.number.int({ min: 100, max: 5_000 }),
       },
       groups: { create: { groupId: groups.contentGroup.id } },
+      ownerships: {
+        create: [
+          {
+            employeeId: users.contentManager.id,
+            role: 'PRIMARY',
+            assignedById: users.superAdmin.id,
+          },
+          {
+            employeeId: users.analyst.id,
+            role: 'SECONDARY',
+            assignedById: users.contentManager.id,
+          },
+        ],
+      },
     },
   });
 
-  return { youtube, facebook, instagram };
+  // --- 4. Telegram (PRIMARY: contentStaff1) ---
+  const telegram = await prisma.channel.create({
+    data: {
+      name: 'Company Telegram Channel',
+      platform: Platform.TELEGRAM,
+      accountId: '-100' + faker.string.numeric(10),
+      externalUrl: 'https://t.me/companyofficial',
+      description: 'Tin tức nhanh + thông báo nội bộ',
+      category: 'Tin tức',
+      accessToken: 'SEED_DUMMY_NOT_ENCRYPTED',
+      tokenExpiresAt: null,
+      status: ChannelStatus.ACTIVE,
+      metadata: {
+        chatId: faker.string.numeric(13),
+        title: 'Company Official',
+        memberCount: faker.number.int({ min: 5_000, max: 50_000 }),
+      },
+      groups: { create: { groupId: groups.contentGroup.id } },
+      ownerships: {
+        create: {
+          employeeId: users.contentStaff1.id,
+          role: 'PRIMARY',
+          assignedById: users.contentManager.id,
+        },
+      },
+    },
+  });
+
+  // --- 5. WhatsApp (INACTIVE — chưa kết nối token) ---
+  const whatsapp = await prisma.channel.create({
+    data: {
+      name: 'Company WhatsApp Business',
+      platform: Platform.WHATSAPP,
+      accountId: faker.string.numeric(15),
+      externalUrl: 'https://wa.me/' + faker.string.numeric(10),
+      description: 'Customer support qua WhatsApp Business',
+      category: 'Hỗ trợ khách hàng',
+      accessToken: null,
+      tokenExpiresAt: null,
+      status: ChannelStatus.INACTIVE,
+      lastSyncError: 'NOT_CONNECTED',
+      metadata: {
+        phoneNumberId: faker.string.numeric(15),
+        displayName: 'Company Support',
+        verifiedName: 'Company Official',
+      },
+      groups: { create: { groupId: groups.contentGroup.id } },
+      ownerships: {
+        create: {
+          employeeId: users.hrAdmin.id,
+          role: 'PRIMARY',
+          assignedById: users.superAdmin.id,
+        },
+      },
+    },
+  });
+
+  return { youtube, facebook, instagram, telegram, whatsapp };
 }
 
 // V2 stripped: seedPosts + seedTasks (Post + Task entities bỏ).
@@ -394,14 +490,16 @@ async function seedChannels(
 // =============================================================================
 
 async function seedAnalytics(channels: Awaited<ReturnType<typeof seedChannels>>) {
-  console.log('📊 Seed analytics (30 ngày × 3 kênh)...');
+  console.log('📊 Seed analytics (30 ngày × 4 kênh active)...');
 
   const rows: Prisma.AnalyticsCreateManyInput[] = [];
 
+  // WhatsApp INACTIVE → bỏ qua analytics
   const channelList = [
     { ch: channels.youtube, baseViews: 50_000, baseSubs: 200_000, baseRev: 50 },
     { ch: channels.facebook, baseViews: 30_000, baseSubs: 150_000, baseRev: 20 },
     { ch: channels.instagram, baseViews: 20_000, baseSubs: 80_000, baseRev: 10 },
+    { ch: channels.telegram, baseViews: 8_000, baseSubs: 15_000, baseRev: 0 },
   ];
 
   for (const { ch, baseViews, baseSubs, baseRev } of channelList) {
@@ -496,9 +594,8 @@ async function main() {
   console.log(`  Role-permission rows  : ${permResult.rolePermsCount}`);
   console.log(`  Groups                : 4 (SYSTEM + HR + Content + Analytics)`);
   console.log(`  Users                 : 6 (1 SuperAdmin + 5 regular)`);
-  console.log(`  Channels              : 3 (YouTube + Facebook + Instagram)`);
-  console.log(`  Posts                 : 5 (DRAFT, SCHEDULED, PUBLISHED, REVIEWING, REJECTED)`);
-  console.log(`  Tasks                 : 5`);
+  console.log(`  Channels              : 5 (YT + FB + IG + TG + WA)`);
+  console.log(`  ChannelOwnerships     : 7 (5 PRIMARY + 2 SECONDARY)`);
   console.log(`  Analytics rows        : ${analyticsCount}`);
   console.log(`  Alerts                : 3`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

@@ -18,7 +18,6 @@ import {
   Trash2,
   TrendingUp,
   Users,
-  XCircle,
 } from 'lucide-react';
 import type { ChannelStatus } from '@prisma/client';
 
@@ -47,34 +46,22 @@ const STATUS_META: Record<
   }
 > = {
   ACTIVE: {
-    label: 'Connected',
+    label: 'Active',
     badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
     border: 'border-emerald-500/40',
     Icon: CheckCircle2,
   },
-  TOKEN_EXPIRED: {
-    label: 'Token Expired',
+  INACTIVE: {
+    label: 'Inactive',
     badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
     border: 'border-amber-500/40',
     Icon: AlertTriangle,
   },
-  SUSPENDED: {
-    label: 'Suspended',
-    badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-    border: 'border-amber-500/40',
-    Icon: AlertTriangle,
-  },
-  DISCONNECTED: {
-    label: 'Disconnected',
+  ARCHIVED: {
+    label: 'Archived',
     badge: 'bg-muted text-muted-foreground border-muted-foreground/30',
     border: 'border-muted',
     Icon: PlugZap,
-  },
-  ERROR: {
-    label: 'Error',
-    badge: 'bg-destructive/10 text-destructive border-destructive/30',
-    border: 'border-destructive/40',
-    Icon: XCircle,
   },
 };
 
@@ -229,9 +216,9 @@ export function ChannelCard({
           variant="outline"
           size="sm"
           onClick={() => onSync(channel.id)}
-          disabled={isSyncing || channel.status === 'TOKEN_EXPIRED'}
+          disabled={isSyncing || channel.status === 'INACTIVE'}
           title={
-            channel.status === 'TOKEN_EXPIRED' ? 'Reconnect kênh trước khi sync' : ''
+            channel.status === 'INACTIVE' ? 'Reconnect kênh trước khi sync' : ''
           }
         >
           <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />

@@ -32,24 +32,14 @@ const STATUS_BADGE: Record<string, { label: string; className: string; icon: typ
     className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
     icon: CheckCircle2,
   },
-  TOKEN_EXPIRED: {
-    label: 'Token hết hạn',
+  INACTIVE: {
+    label: 'Inactive',
     className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
     icon: AlertTriangle,
   },
-  SUSPENDED: {
-    label: 'Tạm dừng',
-    className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-    icon: AlertTriangle,
-  },
-  DISCONNECTED: {
-    label: 'Đã ngắt',
-    className: 'bg-destructive/10 text-destructive border-destructive/30',
-    icon: AlertTriangle,
-  },
-  ERROR: {
-    label: 'Lỗi',
-    className: 'bg-destructive/10 text-destructive border-destructive/30',
+  ARCHIVED: {
+    label: 'Archived',
+    className: 'bg-muted text-muted-foreground border-muted-foreground/30',
     icon: AlertTriangle,
   },
 };

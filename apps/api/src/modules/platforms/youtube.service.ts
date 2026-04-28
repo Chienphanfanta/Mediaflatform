@@ -81,7 +81,6 @@ const CHANNEL_SELECT = {
   id: true,
   platform: true,
   accountId: true,
-  ownerId: true,
   accessToken: true,
   refreshToken: true,
   tokenExpiresAt: true,
@@ -505,7 +504,7 @@ export class YouTubeService {
     await this.prisma.channel
       .update({
         where: { id: channelId },
-        data: { status: ChannelStatus.TOKEN_EXPIRED },
+        data: { status: ChannelStatus.INACTIVE, lastSyncError: 'TOKEN_EXPIRED' },
       })
       .catch(() => {
         /* ignore */

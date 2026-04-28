@@ -366,10 +366,8 @@ export class AnalyticsSyncWorker extends WorkerHost {
 // ────────── Helpers ──────────
 
 function unhealthySkipReason(status: string): string | null {
-  if (status === 'TOKEN_EXPIRED') return 'token-expired';
-  if (status === 'DISCONNECTED') return 'disconnected';
-  if (status === 'ERROR') return 'channel-error';
-  if (status === 'SUSPENDED') return 'channel-suspended';
+  if (status === 'INACTIVE') return 'channel-inactive';
+  if (status === 'ARCHIVED') return 'channel-archived';
   return null;
 }
 

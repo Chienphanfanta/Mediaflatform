@@ -38,8 +38,8 @@ export const POST = withAuth(
     const jobIds: string[] = [];
 
     for (const c of allowedChannels) {
-      // Skip channels có token hết hạn
-      if (c.status === 'TOKEN_EXPIRED') continue;
+      // Skip channels không ACTIVE (token expired/archived)
+      if (c.status !== 'ACTIVE') continue;
 
       const jobId = `sync-${c.id}-${Date.now().toString(36)}`;
       jobIds.push(jobId);
