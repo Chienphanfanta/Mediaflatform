@@ -39,6 +39,7 @@ import { formatCompact } from '@/lib/format';
 import { PLATFORM_DOT, PLATFORM_LABEL } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 import type { KpiWithRelations } from '@/lib/types/kpi';
+import { KPIProgressBar } from './kpi-progress-bar';
 
 const STATUS_META: Record<
   KPIStatus,
@@ -88,9 +89,6 @@ export function KpiCard({ kpi, hideContext }: Props) {
   const remove = useDeleteKpi();
 
   const meta = STATUS_META[kpi.status];
-  const avg = kpi.achievementPercent ?? 0;
-  // Cap progress bar visual ở 100% (EXCEEDED hiển thị riêng qua badge)
-  const barWidth = Math.min(avg, 100);
 
   const handleRecalc = () => recalc.mutate(kpi.id);
   const handleDelete = () => {
@@ -213,32 +211,15 @@ export function KpiCard({ kpi, hideContext }: Props) {
           )}
         </div>
 
-        {/* Progress bar */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-medium">
-              Achievement{' '}
-              {kpi.achievementPercent !== null ? (
-                <span className={cn('tabular-nums', achievementClass(kpi.status))}>
-                  {kpi.achievementPercent.toFixed(1)}%
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Chưa tính</span>
-              )}
-            </span>
-            {kpi.achievementPercent !== null && kpi.achievementPercent > 100 && (
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                +{(kpi.achievementPercent - 100).toFixed(1)}%
-              </span>
-            )}
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn('h-full transition-all', meta.barClass)}
-              style={{ width: `${barWidth}%` }}
-            />
-          </div>
-        </div>
+        {/* Progress bar (color-coded theo % thresholds) */}
+        <KPIProgressBar
+          percent={kpi.achievementPercent}
+          label={
+            kpi.achievementPercent === null
+              ? 'Chưa tính achievement'
+              : 'Achievement trung bình'
+          }
+        />
 
         {/* Per-target breakdown — collapsible */}
         <button
@@ -337,9 +318,3 @@ function formatPeriod(kpi: { periodStart: string; periodEnd: string }): string {
   return `${start} → ${end}`;
 }
 
-function achievementClass(status: KPIStatus): string {
-  if (status === 'EXCEEDED') return 'text-emerald-700 dark:text-emerald-300';
-  if (status === 'ACHIEVED') return 'text-emerald-600 dark:text-emerald-400';
-  if (status === 'MISSED') return 'text-destructive';
-  return '';
-}
