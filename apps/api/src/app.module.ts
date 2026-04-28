@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './lib/redis.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
+import { KpiModule } from './modules/kpi/kpi.module';
 import { PlatformsModule } from './modules/platforms/platforms.module';
 import { QueueModule } from './modules/queue/queue.module';
 
@@ -16,6 +17,7 @@ import { QueueModule } from './modules/queue/queue.module';
     PrismaModule,
     RedisModule,
     AlertsModule,
+    KpiModule,
     PlatformsModule,
     QueueModule,
   ],

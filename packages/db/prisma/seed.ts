@@ -117,6 +117,7 @@ async function cleanup() {
   // Thứ tự: con trước, cha sau (tránh vi phạm FK)
   await prisma.alert.deleteMany();
   await prisma.analytics.deleteMany();
+  await prisma.kPI.deleteMany();
   // V1-REMOVED: task/post/mediaLibrary entities bỏ V2.
   await prisma.channelOwnership.deleteMany();
   await prisma.channelGroup.deleteMany();
@@ -581,7 +582,96 @@ async function seedAnalytics(
 }
 
 // =============================================================================
-// 8. ALERTS (vài cảnh báo mẫu)
+// 8. KPIs (4 sample: 2 PER_CHANNEL + 2 PER_EMPLOYEE)
+// =============================================================================
+
+async function seedKpis(
+  tenantId: string,
+  users: Awaited<ReturnType<typeof seedUsers>>,
+  channels: Awaited<ReturnType<typeof seedChannels>>,
+) {
+  console.log('🎯 Seed KPIs...');
+
+  // Period: tháng hiện tại (MONTHLY)
+  const now = new Date();
+  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const periodEnd = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59),
+  );
+
+  await prisma.kPI.createMany({
+    data: [
+      // 1. PER_CHANNEL YouTube — assigned to contentManager (PRIMARY owner YT)
+      {
+        tenantId,
+        scope: 'PER_CHANNEL',
+        channelId: channels.youtube.id,
+        employeeId: users.contentManager.id,
+        periodType: 'MONTHLY',
+        periodStart,
+        periodEnd,
+        targetFollowers: 220_000,
+        targetFollowersGain: 5_000,
+        targetViews: 1_500_000,
+        targetWatchTime: 30_000,
+        targetEngagement: 5.0,
+        notes: 'KPI tháng — YouTube growth + watch time mục tiêu monetization',
+        assignedById: users.superAdmin.id,
+        status: 'IN_PROGRESS',
+      },
+      // 2. PER_CHANNEL Telegram — assigned to contentStaff1 (PRIMARY owner TG)
+      {
+        tenantId,
+        scope: 'PER_CHANNEL',
+        channelId: channels.telegram.id,
+        employeeId: users.contentStaff1.id,
+        periodType: 'MONTHLY',
+        periodStart,
+        periodEnd,
+        targetFollowersGain: 500,
+        notes: 'Telegram metrics minimal — chỉ track member growth',
+        assignedById: users.contentManager.id,
+        status: 'IN_PROGRESS',
+      },
+      // 3. PER_EMPLOYEE contentManager — aggregate across YT + IG (2 channels owned)
+      {
+        tenantId,
+        scope: 'PER_EMPLOYEE',
+        channelId: null,
+        employeeId: users.contentManager.id,
+        periodType: 'MONTHLY',
+        periodStart,
+        periodEnd,
+        targetViews: 2_500_000,
+        targetFollowersGain: 8_000,
+        targetEngagement: 4.5,
+        notes: 'KPI tổng — sum cross-channel content manager',
+        assignedById: users.superAdmin.id,
+        status: 'IN_PROGRESS',
+      },
+      // 4. PER_EMPLOYEE contentStaff1 — channels: YT (SECONDARY) + TG (PRIMARY)
+      {
+        tenantId,
+        scope: 'PER_EMPLOYEE',
+        channelId: null,
+        employeeId: users.contentStaff1.id,
+        periodType: 'MONTHLY',
+        periodStart,
+        periodEnd,
+        targetViews: 800_000,
+        targetFollowersGain: 2_000,
+        notes: 'KPI tổng staff1 — YT secondary + TG primary',
+        assignedById: users.contentManager.id,
+        status: 'IN_PROGRESS',
+      },
+    ],
+  });
+
+  return 4;
+}
+
+// =============================================================================
+// 9. ALERTS (vài cảnh báo mẫu)
 // =============================================================================
 
 async function seedAlerts(
@@ -639,6 +729,7 @@ async function main() {
   const channels = await seedChannels(tenant.id, users, groups);
   // V2 stripped: seedPosts + seedTasks (Post + Task entities bỏ).
   const analyticsCount = await seedAnalytics(tenant.id, channels);
+  const kpiCount = await seedKpis(tenant.id, users, channels);
   await seedAlerts(tenant.id, channels);
 
   console.log('\n✅ Seed hoàn tất!');
@@ -651,6 +742,7 @@ async function main() {
   console.log(`  Channels              : 5 (YT + FB + IG + TG + WA)`);
   console.log(`  ChannelOwnerships     : 7 (5 PRIMARY + 2 SECONDARY)`);
   console.log(`  Analytics rows        : ${analyticsCount}`);
+  console.log(`  KPIs                  : ${kpiCount} (2 PER_CHANNEL + 2 PER_EMPLOYEE)`);
   console.log(`  Alerts                : 3`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🔑 Login:');

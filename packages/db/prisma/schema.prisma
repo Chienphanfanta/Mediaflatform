@@ -164,6 +164,25 @@ enum SyncStatus {
   SKIPPED // rate-limited, quota-paused, token-expired
 }
 
+enum KPIScope {
+  PER_CHANNEL // KPI giao cho 1 channel (Channel.id required)
+  PER_EMPLOYEE // KPI tổng giao cho nhân viên (sum tất cả channels employee phụ trách)
+}
+
+enum PeriodType {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum KPIStatus {
+  NOT_STARTED // periodStart > now
+  IN_PROGRESS // periodStart <= now <= periodEnd
+  ACHIEVED // achievementPercent ≥ 100, period chưa end
+  EXCEEDED // achievementPercent ≥ 120, period chưa end
+  MISSED // periodEnd < now và achievementPercent < 100
+}
+
 // =============================================================================
 // MODELS
 // =============================================================================
@@ -189,6 +208,7 @@ model Tenant {
   channels  Channel[]
   analytics Analytics[]
   alerts    Alert[]
+  kpis      KPI[]
 
   @@index([slug])
   @@index([status])
@@ -212,6 +232,8 @@ model User {
   channelOwnerships    ChannelOwnership[]        @relation("ChannelOwnerships")
   devices              UserDevice[]
   notificationSettings UserNotificationSettings?
+  kpis                 KPI[]                     @relation("EmployeeKPIs")
+  assignedKpis         KPI[]                     @relation("KPIAssignedBy")
 
   // Email unique trong scope tenant (không global)
   @@unique([tenantId, email])
@@ -314,6 +336,7 @@ model Channel {
   alerts     Alert[]
   groups     ChannelGroup[]
   ownerships ChannelOwnership[]
+  kpis       KPI[]
 
   // accountId+platform unique trong scope tenant (cho phép 2 tenants connect cùng 1 kênh thật)
   @@unique([tenantId, platform, accountId])
@@ -486,6 +509,56 @@ model Alert {
   @@index([createdAt])
   @@index([channelId, isRead])
   @@index([severity, isRead])
+}
+
+// --- 11.5 KPI -------------------------------------------------------------
+// Chỉ tiêu giao theo kênh hoặc theo nhân viên. achievementPercent = average
+// của các target có set (followers, followersGain, views, watchTime, engagement);
+// status auto theo achievementPercent + period dates.
+//
+// PER_CHANNEL: aggregate Analytics của 1 channel trong period.
+// PER_EMPLOYEE: aggregate Analytics của tất cả channels mà employee là owner.
+model KPI {
+  id        String   @id @default(cuid())
+  tenantId  String
+
+  scope      KPIScope
+  channelId  String? // null khi scope = PER_EMPLOYEE
+  employeeId String
+
+  periodType  PeriodType
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+
+  // Targets — set null cho target không áp dụng
+  targetFollowers     Int?
+  targetFollowersGain Int? // tăng trưởng follower trong period
+  targetViews         Int?
+  targetWatchTime     Float?
+  targetEngagement    Float?
+
+  // Calculated automatically by KpiCronService + manual recalc
+  achievementPercent Float?
+  status             KPIStatus @default(NOT_STARTED)
+
+  // Audit
+  assignedById String
+  assignedAt   DateTime @default(now())
+  notes        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel    Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  employee   User     @relation("EmployeeKPIs", fields: [employeeId], references: [id], onDelete: Cascade)
+  assignedBy User     @relation("KPIAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, employeeId, periodStart])
+  @@index([tenantId, channelId, periodStart])
+  @@index([tenantId, status])
+  @@index([periodEnd]) // cron tìm KPI period vừa expire
 }
 
 // V1-REMOVED // --- 12. MediaLibrary ------------------------------------------------------

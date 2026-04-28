@@ -17,6 +17,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'Channel',
   'Analytics',
   'Alert',
+  'KPI',
 ]);
 
 const READ_OPS = new Set([
