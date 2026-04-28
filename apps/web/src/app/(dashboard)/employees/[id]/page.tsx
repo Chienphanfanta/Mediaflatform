@@ -1,12 +1,12 @@
-// /hr/[id] — chi tiết tổng hợp 1 nhân sự V2 stripped (no posts/tasks/KPI).
-// Sprint 6 sẽ thêm KPI assignments + ChannelOwnership cards.
+// /employees/[id] — chi tiết nhân sự + channels + KPI section (Day 7).
 'use client';
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { AlertCircle, ArrowLeft, Tv, UserX } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Plus, Target, Tv, UserX } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,6 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CreateKpiDialog } from '@/components/kpi/create-kpi-dialog';
+import { KpiCard } from '@/components/kpi/kpi-card';
+import { useKpiSummaryEmployee } from '@/hooks/use-kpi';
+import { usePermission } from '@/hooks/use-permission';
 import { PLATFORM_DOT, PLATFORM_LABEL } from '@/lib/platform';
 import type { HRUserDetail } from '@/lib/types/hr';
 import { cn } from '@/lib/utils';
@@ -94,6 +98,7 @@ export default function HRUserDetailPage({
         <>
           <UserHeader detail={data} />
           <ChannelsCard detail={data} />
+          <EmployeeKpisSection employeeId={data.id} />
         </>
       )}
     </div>
@@ -211,6 +216,72 @@ function ChannelsCard({ detail }: { detail: HRUserDetail }) {
           </div>
         )}
       </CardContent>
+    </Card>
+  );
+}
+
+function EmployeeKpisSection({ employeeId }: { employeeId: string }) {
+  const { atLeast } = usePermission();
+  const canManage = atLeast('MANAGER');
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const { data, isLoading, isError, error } = useKpiSummaryEmployee(employeeId);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Target className="h-4 w-4" />
+          KPI ({data?.totals.totalKpis ?? 0})
+          {data?.totals.avgAchievement !== null &&
+            data?.totals.avgAchievement !== undefined && (
+              <span className="text-xs font-normal text-muted-foreground">
+                · TB {data.totals.avgAchievement.toFixed(1)}%
+              </span>
+            )}
+        </CardTitle>
+        {canManage && (
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Giao KPI
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-destructive">
+            {error?.message ?? 'Lỗi tải KPI'}
+          </p>
+        ) : !data || data.kpis.length === 0 ? (
+          <div className="rounded-md border border-dashed py-6 text-center">
+            <Target className="mx-auto h-8 w-8 text-muted-foreground/40" />
+            <p className="mt-2 text-sm font-medium">Chưa có KPI nào</p>
+            <p className="text-xs text-muted-foreground">
+              {canManage
+                ? 'Giao KPI cho nhân viên này theo tháng/quý/năm.'
+                : 'Manager chưa giao KPI cho period hiện tại.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {data.kpis.map((kpi) => (
+              <KpiCard key={kpi.id} kpi={kpi} hideContext="employee" />
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <CreateKpiDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        defaultEmployeeId={employeeId}
+      />
     </Card>
   );
 }

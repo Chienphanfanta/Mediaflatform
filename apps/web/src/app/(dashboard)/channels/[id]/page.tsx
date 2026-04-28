@@ -102,7 +102,7 @@ export default function ChannelDetailPage() {
             </TabsContent>
 
             <TabsContent value="kpi">
-              <TabKpi />
+              <TabKpi channelId={data.id} />
             </TabsContent>
 
             <TabsContent value="owners">
