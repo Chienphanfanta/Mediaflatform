@@ -18,6 +18,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'Analytics',
   'Alert',
   'KPI',
+  'Department',
 ]);
 
 const READ_OPS = new Set([

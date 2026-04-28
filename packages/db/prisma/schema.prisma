@@ -203,12 +203,13 @@ model Tenant {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  users     User[]
-  groups    Group[]
-  channels  Channel[]
-  analytics Analytics[]
-  alerts    Alert[]
-  kpis      KPI[]
+  users       User[]
+  groups      Group[]
+  channels    Channel[]
+  analytics   Analytics[]
+  alerts      Alert[]
+  kpis        KPI[]
+  departments Department[]
 
   @@index([slug])
   @@index([status])
@@ -216,18 +217,25 @@ model Tenant {
 
 // --- 1. User ---------------------------------------------------------------
 model User {
-  id        String     @id @default(cuid())
-  tenantId  String
-  email     String
-  password  String // bcrypt hash (xem CLAUDE.md §9 rule #1)
-  name      String
-  avatar    String?
-  status    UserStatus @default(ACTIVE)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  deletedAt DateTime?
+  id            String     @id @default(cuid())
+  tenantId      String
+  departmentId  String?
+  email         String
+  password      String // bcrypt hash (xem CLAUDE.md §9 rule #1)
+  name          String
+  avatar        String?
+  phone         String?
+  position      String? // "Senior Editor", "Content Manager"
+  joinDate      DateTime?
+  terminateDate DateTime?
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
 
   tenant               Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department           Department?               @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  managedDepartments   Department[]              @relation("DepartmentManager")
   groupMembers         GroupMember[]
   channelOwnerships    ChannelOwnership[]        @relation("ChannelOwnerships")
   devices              UserDevice[]
@@ -240,6 +248,7 @@ model User {
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, departmentId])
 }
 
 // --- 2. Group --------------------------------------------------------------
@@ -559,6 +568,28 @@ model KPI {
   @@index([tenantId, channelId, periodStart])
   @@index([tenantId, status])
   @@index([periodEnd]) // cron tìm KPI period vừa expire
+}
+
+// --- 11.6 Department -----------------------------------------------------
+// Phòng ban — V2 spec. 1 user thuộc 0-1 dept (User.departmentId), 1 dept có 0-1
+// manager (Department.managerId). Cùng tenant.
+model Department {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  color       String? // hex color cho UI badge (vd "#3b82f6")
+  managerId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  manager User?  @relation("DepartmentManager", fields: [managerId], references: [id], onDelete: SetNull)
+  members User[] @relation("DepartmentMembers")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, managerId])
 }
 
 // V1-REMOVED // --- 12. MediaLibrary ------------------------------------------------------

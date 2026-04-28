@@ -127,6 +127,7 @@ async function cleanup() {
   await prisma.permission.deleteMany();
   await prisma.group.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.department.deleteMany();
   // Tenant cuối — cascade FK đảm bảo các bảng trên đã sạch
   await prisma.tenant.deleteMany();
 }
@@ -153,6 +154,43 @@ async function seedDefaultTenant() {
     },
   });
   return tenant;
+}
+
+// =============================================================================
+// 0.5. DEPARTMENTS (3 dept mẫu — Day 9)
+// =============================================================================
+
+async function seedDepartments(tenantId: string) {
+  console.log('🏢 Seed departments...');
+
+  const content = await prisma.department.create({
+    data: {
+      tenantId,
+      name: 'Content Production',
+      description: 'Sản xuất nội dung trên mọi kênh truyền thông',
+      color: '#3b82f6', // blue
+    },
+  });
+
+  const analytics = await prisma.department.create({
+    data: {
+      tenantId,
+      name: 'Analytics & Insights',
+      description: 'Phân tích số liệu, báo cáo, KPI',
+      color: '#10b981', // emerald
+    },
+  });
+
+  const hr = await prisma.department.create({
+    data: {
+      tenantId,
+      name: 'HR & Operations',
+      description: 'Tuyển dụng, onboarding, vận hành',
+      color: '#f59e0b', // amber
+    },
+  });
+
+  return { content, analytics, hr };
 }
 
 // =============================================================================
@@ -244,11 +282,19 @@ async function seedGroups(tenantId: string) {
 // 3. USERS + GROUP MEMBERS
 // =============================================================================
 
-async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof seedGroups>>) {
+async function seedUsers(
+  tenantId: string,
+  groups: Awaited<ReturnType<typeof seedGroups>>,
+  departments: Awaited<ReturnType<typeof seedDepartments>>,
+) {
   console.log('👥 Seed users...');
 
   const superAdminPass = await hash(SUPERADMIN_PASSWORD);
   const userPass = await hash(DEFAULT_PASSWORD);
+
+  // Helper to create yearAgo date
+  const yearAgo = new Date();
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 
   // --- SuperAdmin ---
   const superAdmin = await prisma.user.create({
@@ -257,8 +303,10 @@ async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof see
       email: SUPERADMIN_EMAIL,
       password: superAdminPass,
       name: 'Super Admin',
+      position: 'Platform Admin',
       avatar: faker.image.avatar(),
       status: UserStatus.ACTIVE,
+      joinDate: yearAgo,
       groupMembers: {
         create: { groupId: groups.systemGroup.id, role: MemberRole.ADMIN },
       },
@@ -269,11 +317,15 @@ async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof see
   const hrAdmin = await prisma.user.create({
     data: {
       tenantId,
+      departmentId: departments.hr.id,
       email: 'hr.admin@company.com',
       password: userPass,
       name: faker.person.fullName({ sex: 'female' }),
+      position: 'HR Manager',
+      phone: faker.phone.number(),
       avatar: faker.image.avatar(),
       status: UserStatus.ACTIVE,
+      joinDate: faker.date.past({ years: 2 }),
       groupMembers: {
         create: { groupId: groups.hrGroup.id, role: MemberRole.ADMIN },
       },
@@ -283,11 +335,15 @@ async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof see
   const contentManager = await prisma.user.create({
     data: {
       tenantId,
+      departmentId: departments.content.id,
       email: 'content.manager@company.com',
       password: userPass,
       name: faker.person.fullName({ sex: 'male' }),
+      position: 'Content Director',
+      phone: faker.phone.number(),
       avatar: faker.image.avatar(),
       status: UserStatus.ACTIVE,
+      joinDate: faker.date.past({ years: 3 }),
       groupMembers: {
         create: { groupId: groups.contentGroup.id, role: MemberRole.MANAGER },
       },
@@ -297,11 +353,15 @@ async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof see
   const contentStaff1 = await prisma.user.create({
     data: {
       tenantId,
+      departmentId: departments.content.id,
       email: 'content.staff1@company.com',
       password: userPass,
       name: faker.person.fullName(),
+      position: 'Senior Editor',
+      phone: faker.phone.number(),
       avatar: faker.image.avatar(),
       status: UserStatus.ACTIVE,
+      joinDate: faker.date.past({ years: 1 }),
       groupMembers: {
         create: { groupId: groups.contentGroup.id, role: MemberRole.STAFF },
       },
@@ -311,11 +371,15 @@ async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof see
   const contentStaff2 = await prisma.user.create({
     data: {
       tenantId,
+      departmentId: departments.content.id,
       email: 'content.staff2@company.com',
       password: userPass,
       name: faker.person.fullName(),
+      position: 'Junior Editor',
+      phone: faker.phone.number(),
       avatar: faker.image.avatar(),
       status: UserStatus.ACTIVE,
+      joinDate: faker.date.recent({ days: 180 }),
       groupMembers: {
         create: { groupId: groups.contentGroup.id, role: MemberRole.STAFF },
       },
@@ -325,15 +389,33 @@ async function seedUsers(tenantId: string, groups: Awaited<ReturnType<typeof see
   const analyst = await prisma.user.create({
     data: {
       tenantId,
+      departmentId: departments.analytics.id,
       email: 'analyst@company.com',
       password: userPass,
       name: faker.person.fullName(),
+      position: 'Data Analyst',
+      phone: faker.phone.number(),
       avatar: faker.image.avatar(),
       status: UserStatus.ACTIVE,
+      joinDate: faker.date.past({ years: 1 }),
       groupMembers: {
         create: { groupId: groups.analyticsGroup.id, role: MemberRole.VIEWER },
       },
     },
+  });
+
+  // Assign managers to departments
+  await prisma.department.update({
+    where: { id: departments.content.id },
+    data: { managerId: contentManager.id },
+  });
+  await prisma.department.update({
+    where: { id: departments.analytics.id },
+    data: { managerId: analyst.id },
+  });
+  await prisma.department.update({
+    where: { id: departments.hr.id },
+    data: { managerId: hrAdmin.id },
   });
 
   return { superAdmin, hrAdmin, contentManager, contentStaff1, contentStaff2, analyst };
@@ -723,9 +805,10 @@ async function main() {
 
   await cleanup();
   const tenant = await seedDefaultTenant();
+  const departments = await seedDepartments(tenant.id);
   const permResult = await seedPermissions();
   const groups = await seedGroups(tenant.id);
-  const users = await seedUsers(tenant.id, groups);
+  const users = await seedUsers(tenant.id, groups, departments);
   const channels = await seedChannels(tenant.id, users, groups);
   // V2 stripped: seedPosts + seedTasks (Post + Task entities bỏ).
   const analyticsCount = await seedAnalytics(tenant.id, channels);
@@ -735,6 +818,7 @@ async function main() {
   console.log('\n✅ Seed hoàn tất!');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`  Tenant                : ${tenant.name} (slug=${tenant.slug})`);
+  console.log(`  Departments           : 3 (Content + Analytics + HR)`);
   console.log(`  Permissions           : ${permResult.permissionsCount}`);
   console.log(`  Role-permission rows  : ${permResult.rolePermsCount}`);
   console.log(`  Groups                : 4 (SYSTEM + HR + Content + Analytics)`);
