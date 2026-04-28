@@ -1,0 +1,32 @@
+{
+  "name": "media-ops-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Media Ops Platform - Quản lý nhân sự và đa kênh truyền thông (YouTube, Facebook, Instagram, Telegram, X, WhatsApp)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "dev:web": "npm run dev --workspace=@media-ops/web",
+    "dev:api": "npm run dev --workspace=@media-ops/api",
+    "db:generate": "npm run generate --workspace=@media-ops/db",
+    "db:migrate": "npm run migrate --workspace=@media-ops/db",
+    "db:studio": "npm run studio --workspace=@media-ops/db"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0",
+    "prettier": "^3.2.0",
+    "eslint": "^8.57.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}

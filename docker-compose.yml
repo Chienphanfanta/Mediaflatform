@@ -1,0 +1,61 @@
+# docker-compose cho local development.
+# Chạy:
+#   docker compose up -d              # start postgres + redis
+#   docker compose down               # stop, giữ data
+#   docker compose down -v            # wipe data (volumes)
+#   docker compose logs -f redis      # tail logs
+#
+# Sau lần đầu start, copy .env.example → .env và chạy migrations:
+#   npm run db:migrate -w @media-ops/db
+#   npm run db:seed -w @media-ops/db
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: media-ops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: media_ops
+      # Tuning nhỏ cho dev — không cần fsync nghiêm khi test
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d media_ops']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: media-ops-redis
+    restart: unless-stopped
+    # appendonly yes → AOF persist (an toàn hơn RDB cho BullMQ jobs)
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory', '256mb', '--maxmemory-policy', 'allkeys-lru']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Optional — Mailpit cho test email (Resend API thật cần internet + key).
+  # Uncomment khi cần debug HTML template.
+  # mailpit:
+  #   image: axllent/mailpit
+  #   container_name: media-ops-mailpit
+  #   ports:
+  #     - '1025:1025'  # SMTP
+  #     - '8025:8025'  # Web UI http://localhost:8025
+  #   restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

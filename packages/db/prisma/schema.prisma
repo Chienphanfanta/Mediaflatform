@@ -1,0 +1,578 @@
+// =============================================================================
+// Media Ops Platform — Prisma schema
+// Postgres 15+ · ORM: Prisma 5
+// Chạy: npm run db:migrate  (tạo migration)
+//       npm run db:generate (sinh client)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+}
+
+enum GroupType {
+  HR
+  CONTENT
+  ANALYTICS
+  SYSTEM
+}
+
+// Role của thành viên trong 1 group.
+// SuperAdmin của hệ thống = ADMIN của group type = SYSTEM.
+enum MemberRole {
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum PermissionAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  FULL
+}
+
+enum Platform {
+  YOUTUBE
+  FACEBOOK
+  INSTAGRAM
+  X
+  TELEGRAM
+  WHATSAPP
+}
+
+enum ChannelStatus {
+  ACTIVE
+  TOKEN_EXPIRED
+  DISCONNECTED
+  ERROR
+  SUSPENDED
+}
+
+// V1-REMOVED enum PostStatus {
+// V1-REMOVED   DRAFT
+// V1-REMOVED   REVIEWING // Staff đã submit cho Manager duyệt
+// V1-REMOVED   APPROVED // Manager duyệt xong, chờ scheduledAt hoặc publish
+// V1-REMOVED   SCHEDULED
+// V1-REMOVED   PUBLISHED
+// V1-REMOVED   PRIVATE
+// V1-REMOVED   REJECTED // Bị Manager từ chối hoặc publish thất bại (xem KNOWN ISSUES về publish failure)
+// V1-REMOVED }
+
+// V1-REMOVED enum TaskStatus {
+// V1-REMOVED   ASSIGNED
+// V1-REMOVED   IN_PROGRESS
+// V1-REMOVED   REVIEWING
+// V1-REMOVED   DONE
+// V1-REMOVED   CANCELLED
+// V1-REMOVED   BLOCKED
+// V1-REMOVED }
+
+// V1-REMOVED enum Priority {
+// V1-REMOVED   LOW
+// V1-REMOVED   NORMAL
+// V1-REMOVED   HIGH
+// V1-REMOVED   URGENT
+// V1-REMOVED }
+
+enum AlertType {
+  TOKEN_EXPIRING
+  TOKEN_EXPIRED
+  POLICY_VIOLATION
+  COPYRIGHT_STRIKE
+  VIEW_DROP
+  MONETIZATION_LOST
+  MONETIZATION_AT_RISK
+  API_ERROR
+  RATE_LIMIT
+  CHANNEL_INACTIVE
+  SCHEDULED_POST_FAILED
+  DEADLINE_APPROACHING
+  OTHER
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// V1-REMOVED enum MediaType {
+// V1-REMOVED   IMAGE
+// V1-REMOVED   VIDEO
+// V1-REMOVED   THUMBNAIL
+// V1-REMOVED }
+
+// V1-REMOVED enum CrossPostGroupStatus {
+// V1-REMOVED   DRAFT
+// V1-REMOVED   SCHEDULED
+// V1-REMOVED   PUBLISHING
+// V1-REMOVED   PUBLISHED
+// V1-REMOVED   PARTIAL // ≥1 variant fail nhưng còn lại đã đăng
+// V1-REMOVED   FAILED
+// V1-REMOVED }
+
+enum JobLogStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  STALLED
+}
+
+enum SyncPriority {
+  HIGH // Channel có video published trong 24h — sync mỗi 1h
+  NORMAL // Active channel — sync mỗi 6h
+  LOW // Inactive (>7 ngày không đăng) — sync mỗi 24h
+}
+
+enum SyncStatus {
+  SUCCESS
+  FAILED
+  SKIPPED // rate-limited, quota-paused, token-expired
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+// --- 1. User ---------------------------------------------------------------
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String // bcrypt hash (xem CLAUDE.md §9 rule #1)
+  name      String
+  avatar    String?
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+
+  groupMembers       GroupMember[]
+  ownedChannels      Channel[]        @relation("ChannelOwner")
+// V1-REMOVED   authoredPosts      Post[]           @relation("PostAuthor")
+  devices            UserDevice[]
+  notificationSettings UserNotificationSettings?
+// V1-REMOVED   authoredCrossPosts CrossPostGroup[] @relation("CrossPostGroupAuthor")
+// V1-REMOVED   assignedTasks Task[]         @relation("TaskAssignee")
+// V1-REMOVED   createdTasks  Task[]         @relation("TaskAssigner")
+// V1-REMOVED   uploads       MediaLibrary[] @relation("MediaUploader")
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// --- 2. Group --------------------------------------------------------------
+model Group {
+  id          String    @id @default(cuid())
+  name        String
+  type        GroupType
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  members         GroupMember[]
+  channels        ChannelGroup[]
+// V1-REMOVED   crossPostGroups CrossPostGroup[] @relation("CrossPostGroupOrg")
+
+  @@index([type])
+  @@index([deletedAt])
+}
+
+// --- 3. GroupMember --------------------------------------------------------
+model GroupMember {
+  userId   String
+  groupId  String
+  role     MemberRole @default(STAFF)
+  joinedAt DateTime   @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([role])
+  @@index([groupId, role]) // "liệt kê ADMIN của 1 group"
+}
+
+// --- 4. Permission ---------------------------------------------------------
+model Permission {
+  id          String           @id @default(cuid())
+  resource    String // 'user' | 'group' | 'channel' | 'post' | 'task' | 'analytics' | 'media' | 'setting'
+  action      PermissionAction
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+}
+
+// --- 5. RolePermission -----------------------------------------------------
+// roleId lưu giá trị enum MemberRole (ADMIN/MANAGER/STAFF/VIEWER).
+// Bảng seed quyền mặc định cho mỗi role — xem packages/db/prisma/seed.ts.
+model RolePermission {
+  roleId       MemberRole
+  permissionId String
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+// --- 6. Channel ------------------------------------------------------------
+model Channel {
+  id             String        @id @default(cuid())
+  name           String
+  platform       Platform
+  accountId      String // ID thật tại platform (channelId/pageId/igUserId/chatId/...)
+  accessToken    String? // AES-256-GCM encrypted (TOKEN_ENCRYPTION_KEY)
+  refreshToken   String? // AES-256-GCM encrypted
+  tokenExpiresAt DateTime?
+  status         ChannelStatus @default(ACTIVE)
+  metadata       Json? // Fields riêng theo platform — xem CLAUDE.md §6
+  ownerId        String
+  /// Lần sync analytics gần nhất. Cron analytics scan theo `syncPriority + lastSyncedAt`
+  /// để pick stale-first (xem AnalyticsCronService.smartSync).
+  lastSyncedAt   DateTime?
+  /// Tự cập nhật bởi SyncPriorityService dựa vào: posts published 24h gần nhất,
+  /// active vs inactive >7 ngày.
+  syncPriority   SyncPriority  @default(NORMAL)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  owner     User           @relation("ChannelOwner", fields: [ownerId], references: [id])
+// V1-REMOVED   posts     Post[]
+  analytics Analytics[]
+  alerts    Alert[]
+  groups    ChannelGroup[]
+// V1-REMOVED   tasks     Task[]
+
+  @@unique([platform, accountId])
+  @@index([ownerId])
+  @@index([platform])
+  @@index([status])
+  @@index([platform, status])
+  @@index([tokenExpiresAt]) // Cron "tìm kênh sắp hết token"
+  @@index([syncPriority, lastSyncedAt]) // Cron analytics: stale-first theo priority
+  @@index([deletedAt])
+}
+
+// --- 7. ChannelGroup -------------------------------------------------------
+model ChannelGroup {
+  channelId String
+  groupId   String
+  addedAt   DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, groupId])
+  @@index([channelId])
+  @@index([groupId])
+}
+
+// V1-REMOVED // --- 8. Post ---------------------------------------------------------------
+// V1-REMOVED model Post {
+// V1-REMOVED   id               String     @id @default(cuid())
+// V1-REMOVED   title            String
+// V1-REMOVED   content          String?
+// V1-REMOVED   mediaUrls        String[]
+// V1-REMOVED   platform         Platform // Denormalize từ Channel.platform để query nhanh theo platform
+// V1-REMOVED   channelId        String
+// V1-REMOVED   scheduledAt      DateTime?
+// V1-REMOVED   publishedAt      DateTime?
+// V1-REMOVED   status           PostStatus @default(DRAFT)
+// V1-REMOVED   authorId         String
+// V1-REMOVED   metadata         Json? // thumbnail, tags, description riêng platform, ...
+// V1-REMOVED   /// Link tới CrossPostGroup nếu post này là variant của chiến dịch đăng đa kênh.
+// V1-REMOVED   crossPostGroupId String?
+// V1-REMOVED   createdAt        DateTime   @default(now())
+// V1-REMOVED   updatedAt        DateTime   @updatedAt
+// V1-REMOVED   deletedAt        DateTime?
+// V1-REMOVED 
+// V1-REMOVED   channel        Channel         @relation(fields: [channelId], references: [id], onDelete: Cascade)
+// V1-REMOVED   author         User            @relation("PostAuthor", fields: [authorId], references: [id])
+// V1-REMOVED   tasks          Task[]
+// V1-REMOVED   crossPostGroup CrossPostGroup? @relation(fields: [crossPostGroupId], references: [id])
+// V1-REMOVED 
+// V1-REMOVED   @@index([channelId])
+// V1-REMOVED   @@index([authorId])
+// V1-REMOVED   @@index([status])
+// V1-REMOVED   @@index([platform])
+// V1-REMOVED   @@index([scheduledAt])
+// V1-REMOVED   @@index([publishedAt])
+// V1-REMOVED   @@index([status, scheduledAt]) // Scheduler: "SCHEDULED + scheduledAt <= now"
+// V1-REMOVED   @@index([channelId, status])
+// V1-REMOVED   @@index([crossPostGroupId])
+// V1-REMOVED   @@index([deletedAt])
+// V1-REMOVED }
+
+// V1-REMOVED // --- 9. Task ---------------------------------------------------------------
+// V1-REMOVED model Task {
+// V1-REMOVED   id          String     @id @default(cuid())
+// V1-REMOVED   title       String
+// V1-REMOVED   description String?
+// V1-REMOVED   assigneeId  String?
+// V1-REMOVED   assignerId  String
+// V1-REMOVED   channelId   String?
+// V1-REMOVED   postId      String?
+// V1-REMOVED   status      TaskStatus @default(ASSIGNED)
+// V1-REMOVED   priority    Priority   @default(NORMAL)
+// V1-REMOVED   dueDate     DateTime?
+// V1-REMOVED   completedAt DateTime?
+// V1-REMOVED   createdAt   DateTime   @default(now())
+// V1-REMOVED   updatedAt   DateTime   @updatedAt
+// V1-REMOVED 
+// V1-REMOVED   assignee User?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
+// V1-REMOVED   assigner User     @relation("TaskAssigner", fields: [assignerId], references: [id])
+// V1-REMOVED   channel  Channel? @relation(fields: [channelId], references: [id])
+// V1-REMOVED   post     Post?    @relation(fields: [postId], references: [id])
+// V1-REMOVED 
+// V1-REMOVED   @@index([assigneeId])
+// V1-REMOVED   @@index([assignerId])
+// V1-REMOVED   @@index([channelId])
+// V1-REMOVED   @@index([postId])
+// V1-REMOVED   @@index([status])
+// V1-REMOVED   @@index([priority])
+// V1-REMOVED   @@index([dueDate])
+// V1-REMOVED   @@index([assigneeId, status]) // "task của tôi đang mở"
+// V1-REMOVED   @@index([status, dueDate]) // "task quá hạn"
+// V1-REMOVED }
+
+// --- 10. Analytics ---------------------------------------------------------
+// Snapshot số liệu hàng ngày theo channel. Unique (channelId, date) để upsert idempotent.
+model Analytics {
+  id              String   @id @default(cuid())
+  channelId       String
+  date            DateTime @db.Date
+  platform        Platform
+  views           Int      @default(0)
+  watchTimeHours  Float    @default(0)
+  subscribers     Int      @default(0)
+  subscriberDelta Int      @default(0)
+  revenue         Float    @default(0)
+  engagementRate  Float    @default(0)
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  raw             Json? // Payload gốc từ platform để debug/mở rộng metrics sau này
+  fetchedAt       DateTime @default(now())
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, date])
+  @@index([channelId])
+  @@index([date])
+  @@index([platform])
+  @@index([platform, date])
+  @@index([channelId, date(sort: Desc)]) // Biểu đồ timeseries mới nhất
+}
+
+// --- 11. Alert -------------------------------------------------------------
+model Alert {
+  id        String        @id @default(cuid())
+  channelId String
+  type      AlertType
+  message   String
+  severity  AlertSeverity @default(MEDIUM)
+  isRead    Boolean       @default(false)
+  metadata  Json?
+  createdAt DateTime      @default(now())
+  readAt    DateTime?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId])
+  @@index([isRead])
+  @@index([severity])
+  @@index([type])
+  @@index([createdAt])
+  @@index([channelId, isRead]) // Badge "kênh X có N alert chưa đọc"
+  @@index([severity, isRead]) // Dashboard: CRITICAL chưa đọc
+}
+
+// V1-REMOVED // --- 12. MediaLibrary ------------------------------------------------------
+// V1-REMOVED model MediaLibrary {
+// V1-REMOVED   id          String    @id @default(cuid())
+// V1-REMOVED   filename    String
+// V1-REMOVED   url         String
+// V1-REMOVED   type        MediaType
+// V1-REMOVED   mimeType    String?
+// V1-REMOVED   sizeBytes   Int?
+// V1-REMOVED   width       Int? // cho IMAGE/THUMBNAIL
+// V1-REMOVED   height      Int?
+// V1-REMOVED   durationSec Int? // cho VIDEO
+// V1-REMOVED   uploadedBy  String
+// V1-REMOVED   tags        String[]
+// V1-REMOVED   createdAt   DateTime  @default(now())
+// V1-REMOVED   deletedAt   DateTime?
+// V1-REMOVED 
+// V1-REMOVED   uploader User @relation("MediaUploader", fields: [uploadedBy], references: [id])
+// V1-REMOVED 
+// V1-REMOVED   @@index([uploadedBy])
+// V1-REMOVED   @@index([type])
+// V1-REMOVED   @@index([createdAt])
+// V1-REMOVED   @@index([tags], type: Gin) // Full-text tìm theo tag (Postgres GIN)
+// V1-REMOVED   @@index([deletedAt])
+// V1-REMOVED }
+
+// V1-REMOVED --- 13. CrossPostGroup -------------------------------------------
+// V1-REMOVED Link 1 nội dung gốc với N variants — bỏ V2 (read-only, không posting).
+// V1-REMOVED
+// V1-REMOVED model CrossPostGroup {
+// V1-REMOVED   id            String               @id @default(cuid())
+// V1-REMOVED   name          String? // Tên campaign (optional)
+// V1-REMOVED   /// Nội dung gốc trước khi adapt — để re-generate variants nếu cần.
+// V1-REMOVED   originalText  String
+// V1-REMOVED   hashtags      String[] // hashtag set gốc, adapter chọn theo từng platform
+// V1-REMOVED   mediaUrls     String[] // media gốc dùng chung
+// V1-REMOVED   status        CrossPostGroupStatus @default(DRAFT)
+// V1-REMOVED   authorId      String
+// V1-REMOVED   groupId       String // Group org (quyền)
+// V1-REMOVED   scheduledAt   DateTime? // Lịch chung (variant có thể có scheduledAt riêng cho "tối ưu tự động")
+// V1-REMOVED   publishedAt   DateTime? // Khi tất cả variants thành PUBLISHED
+// V1-REMOVED   metadata      Json? // { campaignTag, source, abTestVariant, ... }
+// V1-REMOVED   createdAt     DateTime             @default(now())
+// V1-REMOVED   updatedAt     DateTime             @updatedAt
+// V1-REMOVED   deletedAt     DateTime?
+// V1-REMOVED 
+// V1-REMOVED   author User  @relation("CrossPostGroupAuthor", fields: [authorId], references: [id])
+// V1-REMOVED   org    Group @relation("CrossPostGroupOrg", fields: [groupId], references: [id])
+// V1-REMOVED   posts  Post[]
+// V1-REMOVED 
+// V1-REMOVED   @@index([authorId])
+// V1-REMOVED   @@index([groupId])
+// V1-REMOVED   @@index([status])
+// V1-REMOVED   @@index([createdAt])
+// V1-REMOVED   @@index([deletedAt])
+// V1-REMOVED }
+
+// --- 14. JobLog ------------------------------------------------------------
+// Track BullMQ job lifecycle. Mỗi processor log start/complete/fail vào đây
+// để monitor + alert khi failure rate cao. KHÔNG thay BullMQ internal state —
+// đây chỉ là audit trail persistent (BullMQ keys trong Redis có TTL).
+model JobLog {
+  id           String       @id @default(cuid())
+  queueName    String // 'post-publisher' | 'analytics-sync' | 'alert-checker' | 'notification-sender'
+  jobId        String // BullMQ job ID
+  jobName      String? // tên process call (optional)
+  status       JobLogStatus
+  attemptsMade Int          @default(0)
+  data         Json? // Job data payload (truncate nếu > 10KB)
+  result       Json? // Result trả về khi COMPLETED
+  error        String? // Stack trace truncated khi FAILED (≤ 4000 chars)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@index([queueName, status])
+  @@index([queueName, createdAt])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+// --- 15. SyncLog ----------------------------------------------------------
+// Audit trail per-channel cho analytics sync. JobLog tracking BullMQ lifecycle
+// chung cho mọi queue; SyncLog domain-specific (per channel + platform + date)
+// để dashboard "lịch sử sync của channel X" + alert "channel Y đã fail Z lần".
+model SyncLog {
+  id             String     @id @default(cuid())
+  channelId      String
+  platform       Platform
+  date           DateTime?  @db.Date // ngày data sync (null nếu fetch hiện tại)
+  status         SyncStatus
+  recordsUpdated Int        @default(0)
+  durationMs     Int        @default(0)
+  jobId          String? // BullMQ job ID (link sang JobLog)
+  errorMessage   String? // truncated 1000 chars khi FAILED/SKIPPED
+  metadata       Json? // skippedReason, daysFetched, quotaUsed, ...
+  createdAt      DateTime   @default(now())
+
+  @@index([channelId, createdAt(sort: Desc)]) // "sync gần nhất của channel X"
+  @@index([platform, createdAt])
+  @@index([status])
+  @@index([channelId, status]) // count fail của 1 channel
+}
+
+// --- 16. UserDevice ------------------------------------------------------
+// Web Push subscription per device. 1 user có thể có nhiều device (laptop +
+// phone + tablet). `endpoint` unique vì browser issue 1 endpoint duy nhất per
+// device + service worker registration.
+//
+// Khi browser revoke (user uninstall PWA, clear data, hoặc subscription expire):
+// web-push trả status 410 Gone → caller xoá row qua endpoint.
+model UserDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique // FCM/Mozilla/Apple push endpoint URL
+  p256dh    String // ECDH public key (base64url)
+  auth      String // Auth secret (base64url)
+  userAgent String? // Phân biệt thiết bị trong UI settings
+  lastSeenAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// --- 17. UserNotificationSettings ----------------------------------------
+// Per-user toggle cho từng loại push. Mặc định: bật tất cả khi user lần đầu
+// subscribe. User có thể tắt từng loại trong /settings/notifications.
+model UserNotificationSettings {
+  userId String @id
+
+  pushEnabled       Boolean @default(true) // Master toggle (tắt = không gửi push gì)
+  alertCritical     Boolean @default(true) // Severity CRITICAL/HIGH push
+  alertHigh         Boolean @default(true)
+  alertMedium       Boolean @default(false) // Mặc định OFF — tránh spam
+  postFailed        Boolean @default(true) // SCHEDULED_POST_FAILED
+  taskDeadline      Boolean @default(true) // DEADLINE_APPROACHING
+  workflowApproved  Boolean @default(true) // Bài được duyệt
+  workflowRejected  Boolean @default(true) // Bài bị từ chối
+  workflowSubmitted Boolean @default(true) // Có bài mới chờ duyệt (Manager)
+  // Multi-channel preferences (in-app, email, push)
+  inAppEnabled Boolean @default(true)
+  emailEnabled Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// V1-REMOVED --- 18. PostWorkflowHistory --------------------------------------
+// V1-REMOVED Audit trail approval workflow — bỏ V2 (no Post entity).
+// V1-REMOVED
+// V1-REMOVED model PostWorkflowHistory {
+// V1-REMOVED   id         String     @id @default(cuid())
+// V1-REMOVED   postId     String
+// V1-REMOVED   fromStatus PostStatus
+// V1-REMOVED   toStatus   PostStatus
+// V1-REMOVED   userId     String // Người thực hiện chuyển trạng thái
+// V1-REMOVED   comment    String? // Feedback khi reject, note khi approve, ...
+// V1-REMOVED   createdAt  DateTime   @default(now())
+// V1-REMOVED 
+// V1-REMOVED   @@index([postId, createdAt(sort: Desc)]) // Lịch sử của 1 post
+// V1-REMOVED   @@index([userId])
+// V1-REMOVED   @@index([toStatus, createdAt]) // Dashboard: bài bị reject gần đây
+// V1-REMOVED }

@@ -1,0 +1,23 @@
+# Media Ops Platform — internal B2B app
+# Mọi route nghiệp vụ require auth → disallow crawler index để tránh tốn budget
+# + lộ URL pattern. Chỉ cho crawl marketing public sau này (chưa có).
+
+User-agent: *
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /calendar
+Disallow: /channels
+Disallow: /analytics
+Disallow: /reports
+Disallow: /alerts
+Disallow: /review
+Disallow: /settings
+Disallow: /admin
+Disallow: /hr
+Allow: /login
+Allow: /forbidden
+Allow: /offline
+Allow: /manifest.json
+Allow: /icons/
+
+Sitemap: https://mediaops.app/sitemap.xml
