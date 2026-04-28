@@ -231,7 +231,7 @@ export function ChannelCard({
         {/* PRIMARY owner */}
         {primary ? (
           <Link
-            href={`/hr/${primary.employeeId}`}
+            href={`/employees/${primary.employeeId}`}
             className="flex items-center gap-2 rounded-md border bg-muted/30 px-2 py-1.5 text-xs transition-colors hover:bg-accent"
           >
             <Avatar className="h-6 w-6">
@@ -308,7 +308,7 @@ function SecondaryAvatarGroup({ owners }: { owners: ChannelOwnershipBrief[] }) {
       {visible.map((o) => (
         <Link
           key={o.employeeId}
-          href={`/hr/${o.employeeId}`}
+          href={`/employees/${o.employeeId}`}
           title={`${o.name} · SECONDARY`}
         >
           <Avatar className="h-5 w-5 border-2 border-card">

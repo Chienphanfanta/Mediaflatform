@@ -116,7 +116,7 @@ export function ChannelListRow({
       <td className="px-3 py-2.5">
         {primary ? (
           <Link
-            href={`/hr/${primary.employeeId}`}
+            href={`/employees/${primary.employeeId}`}
             className="flex items-center gap-1.5 text-xs hover:underline"
           >
             <Avatar className="h-5 w-5">

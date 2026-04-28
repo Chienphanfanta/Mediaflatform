@@ -13,12 +13,12 @@ const ROUTE_RBAC: Array<{ pattern: RegExp; minRole: EffectiveRole }> = [
   // /settings/queues riêng: SUPERADMIN only (queue monitor expose internal state)
   { pattern: /^\/settings\/queues(\/|$)/, minRole: 'SUPERADMIN' },
   { pattern: /^\/settings(\/|$)/, minRole: 'GROUP_ADMIN' },
-  { pattern: /^\/hr(\/|$)/, minRole: 'MANAGER' },
-  { pattern: /^\/review(\/|$)/, minRole: 'MANAGER' },
+  { pattern: /^\/employees(\/|$)/, minRole: 'MANAGER' },
+  { pattern: /^\/departments(\/|$)/, minRole: 'STAFF' },
+  { pattern: /^\/kpi(\/|$)/, minRole: 'STAFF' },
   { pattern: /^\/reports(\/|$)/, minRole: 'MANAGER' },
   { pattern: /^\/alerts(\/|$)/, minRole: 'VIEWER' },
   { pattern: /^\/channels(\/|$)/, minRole: 'STAFF' },
-  { pattern: /^\/calendar(\/|$)/, minRole: 'STAFF' },
   { pattern: /^\/analytics(\/|$)/, minRole: 'VIEWER' },
   { pattern: /^\/dashboard(\/|$)/, minRole: 'VIEWER' },
 ];

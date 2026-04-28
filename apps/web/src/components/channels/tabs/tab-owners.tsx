@@ -60,7 +60,7 @@ export function TabOwners({ ownerships }: Props) {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <Link
-                  href={`/hr/${o.employeeId}`}
+                  href={`/employees/${o.employeeId}`}
                   className="block truncate text-sm font-medium hover:underline"
                 >
                   {o.name}

@@ -281,7 +281,7 @@ function OwnerSlot({
       </p>
       {owner ? (
         <Link
-          href={`/hr/${owner.employeeId}`}
+          href={`/employees/${owner.employeeId}`}
           className="flex items-center gap-2 hover:underline"
         >
           <Avatar className="h-8 w-8">
@@ -317,7 +317,7 @@ function SecondaryList({ owners }: { owners: ChannelOwnershipDetail[] }) {
           {owners.map((o) => (
             <Link
               key={o.employeeId}
-              href={`/hr/${o.employeeId}`}
+              href={`/employees/${o.employeeId}`}
               className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:bg-accent"
               title={o.email}
             >

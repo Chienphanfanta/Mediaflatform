@@ -139,7 +139,7 @@ function UserRow({ user }: { user: HRUserListItem }) {
     <tr className="transition-colors hover:bg-accent/40">
       <td className="px-4 py-3">
         <Link
-          href={`/hr/${user.id}`}
+          href={`/employees/${user.id}`}
           className="flex items-center gap-3 hover:underline"
         >
           <Avatar className="h-9 w-9">
@@ -172,7 +172,7 @@ function UserRow({ user }: { user: HRUserListItem }) {
       </td>
       <td className="px-4 py-3 text-right">
         <Button asChild variant="ghost" size="sm">
-          <Link href={`/hr/${user.id}`}>Chi tiết →</Link>
+          <Link href={`/employees/${user.id}`}>Chi tiết →</Link>
         </Button>
       </td>
     </tr>

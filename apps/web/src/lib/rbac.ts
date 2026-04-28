@@ -1,11 +1,32 @@
 // RBAC helpers - edge-safe, KHÔNG import Prisma.
 // Mọi dữ liệu permission đã được precompute vào JWT khi login.
-// Xem CLAUDE.md §5 cho ma trận quyền.
+// Xem CLAUDE.md §5 cho ma trận quyền + V2 V2 RBAC table.
+//
+// ───────── V2 PERMISSIONS MATRIX (Day 5) ─────────
+// Dùng để document — runtime check qua `hasPermission()` đọc từ JWT.
+// Naming note: V2 spec dùng SUPER_ADMIN/TENANT_ADMIN. Code hiện tại dùng
+// SUPERADMIN/GROUP_ADMIN (V1 legacy). Day 6+ sẽ rename khi có TENANT_ADMIN
+// thực sự (currently GROUP_ADMIN ≈ tenant-admin scope cho tenant default).
+//
+// | Module       | SUPERADMIN  | GROUP_ADMIN  | MANAGER       | STAFF       | VIEWER |
+// |--------------|-------------|--------------|---------------|-------------|--------|
+// | Tenants      | Full        | Self only    | –             | –           | –      |
+// | Employees    | All tenants | Tenant full  | Department    | Self        | –      |
+// | Departments  | Full        | Tenant full  | Read          | Read        | –      |
+// | Channels     | Full        | Tenant full  | Owned/Dept    | Owned only  | Read   |
+// | KPI          | Full        | Tenant full  | Department    | Self        | Read   |
+// | Analytics    | Full        | Tenant full  | Department    | Owned       | Read   |
+// | Reports      | Full        | Tenant full  | Department    | –           | –      |
+// | Settings     | Full        | Tenant full  | –             | –           | –      |
+// | Integrations | Full        | Tenant full  | –             | –           | –      |
+// ──────────────────────────────────────────────────
 
 import type { GroupType, MemberRole, PermissionAction } from '@prisma/client';
 
 // 5 level hiệu dụng. SUPERADMIN = ADMIN của group có type = SYSTEM.
-// GROUP_ADMIN = ADMIN của group non-SYSTEM.
+// GROUP_ADMIN = ADMIN của group non-SYSTEM (department-level).
+// V2 spec naming: SUPER_ADMIN | TENANT_ADMIN | MANAGER | STAFF | VIEWER —
+// rename Day 6+ khi tenant-admin tách bạch khỏi group-admin.
 export type EffectiveRole = 'SUPERADMIN' | 'GROUP_ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER';
 
 export const ROLE_RANK: Record<EffectiveRole, number> = {

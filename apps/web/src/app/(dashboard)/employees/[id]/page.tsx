@@ -64,7 +64,7 @@ export default function HRUserDetailPage({
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link href="/hr">
+        <Link href="/employees">
           <ArrowLeft className="h-4 w-4" />
           Quay lại danh sách
         </Link>
@@ -115,7 +115,7 @@ function NotFoundState() {
           </p>
         </div>
         <Button asChild className="mt-2">
-          <Link href="/hr">
+          <Link href="/employees">
             <ArrowLeft className="h-4 w-4" />
             Về danh sách nhân sự
           </Link>

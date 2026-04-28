@@ -134,7 +134,7 @@ export default async function ProfilePage() {
         />
         {effectiveRole && ['MANAGER', 'GROUP_ADMIN', 'SUPERADMIN'].includes(effectiveRole) && (
           <ActionCard
-            href={`/hr/${user.id}`}
+            href={`/employees/${user.id}`}
             icon={LayoutDashboard}
             title="Hồ sơ KPI"
             description="Xem aggregate metrics 30 ngày — posts, tasks, KPI."

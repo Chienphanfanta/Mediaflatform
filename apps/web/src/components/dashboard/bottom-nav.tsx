@@ -1,18 +1,17 @@
 // Bottom navigation — chỉ hiện trên mobile (<640px).
-// 5 tab: Dashboard / HR / Channels / Analytics / Menu.
-// V2 thay /calendar → /hr (V2 read-only HR + tracker, không có content calendar).
-// Tab "Menu" mở Sheet slide từ dưới lên với full nav items + UserMenu.
+// V2 Day 5: 5 tab spec — Dashboard | Nhân sự | Kênh | KPI | Menu.
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BarChart3,
   LayoutDashboard,
   Menu as MenuIcon,
-  Tv,
+  Radio,
+  Target,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
 
 import {
@@ -29,15 +28,15 @@ import { UserMenu } from './user-menu';
 type Tab = {
   href?: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: LucideIcon;
   isMenu?: boolean;
 };
 
 const TABS: Tab[] = [
-  { href: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-  { href: '/hr', label: 'Nhân sự', icon: Users },
-  { href: '/channels', label: 'Kênh', icon: Tv },
-  { href: '/analytics', label: 'Số liệu', icon: BarChart3 },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/employees', label: 'Nhân sự', icon: Users },
+  { href: '/channels', label: 'Kênh', icon: Radio },
+  { href: '/kpi', label: 'KPI', icon: Target },
   { label: 'Menu', icon: MenuIcon, isMenu: true },
 ];
 
