@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatVnDateTime } from '@/components/posts/post-status';
+import { ReminderSettingsCard } from '@/components/posts/reminder-settings-card';
 import {
   useBrowserDevices,
   useCreatePairCode,
@@ -105,6 +106,8 @@ export default function DevicesPage() {
           )}
         </CardContent>
       </Card>
+
+      <ReminderSettingsCard />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">

@@ -1,0 +1,9 @@
+Windows Registry Editor Version 5.00
+
+; Ép cài extension "Media Ops — Tự đăng bài" cho MỌI người dùng Chrome trên máy này.
+; YÊU CẦU: extension đã được đăng lên Chrome Web Store (có thể ở chế độ "Không công khai").
+; Thay EXTENSION_ID_CUA_BAN bằng ID 32 ký tự lấy từ Chrome Web Store.
+; Chạy file bằng quyền Administrator, rồi mở chrome://policy → "Tải lại chính sách".
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist]
+"1"="EXTENSION_ID_CUA_BAN;https://clients2.google.com/service/update2/crx"

@@ -18,13 +18,20 @@
 - Dashboard tăng trưởng với granularity: tổng công ty / phòng ban / nhân viên / kênh
 - Có thể bán hoặc cài đặt cho team khác (mỗi team là 1 tenant riêng biệt)
 
-**KHÔNG làm:**
-- KHÔNG tạo bài viết, KHÔNG đăng bài, KHÔNG schedule posts
-- KHÔNG approval workflow
-- KHÔNG cross-posting hoặc media library
-- KHÔNG tạo content hay edit content
+**Đăng bài qua browser extension (thêm sau V2):**
+- Soạn bài + hẹn giờ trên web (`/posts`), media lưu MinIO
+- Extension Chrome / Cốc Cốc (`apps/extension`) trên máy nhân viên phụ trách kênh TỰ ĐĂNG
+  bằng tài khoản đang đăng nhập trên trình duyệt — không qua API đăng bài của nền tảng
+- Nhắc lịch qua Telegram bot / Zalo OA; quản lý trình duyệt (ghép, thu hồi)
+- Chi tiết: `.claude/skills/extension-posting.md`
 
-**Đây là READ-ONLY monitoring tool.** Mọi tương tác với platforms chỉ là GET metrics, không bao giờ POST/PUT/DELETE.
+**KHÔNG làm:**
+- KHÔNG approval workflow (đăng thẳng, không duyệt)
+- KHÔNG gọi API GHI của nền tảng (OAuth chỉ xin scope đọc metrics) — đăng bài chỉ qua extension
+- KHÔNG giả mạo vân tay trình duyệt / đổi IP / né cơ chế chống spam của nền tảng —
+  extension chỉ thao tác trên trình duyệt thật của nhân viên, tài khoản thật của công ty
+
+**Sync metrics vẫn READ-ONLY:** module platforms/metrics chỉ GET metrics, không POST/PUT/DELETE.
 
 ---
 
@@ -573,6 +580,7 @@ SENTRY_DSN=""
 | API route                   | `api-patterns.md`               |
 | RBAC permission             | `rbac-patterns.md`              |
 | UI component                | `ui-components.md`              |
+| Đăng bài qua extension      | `extension-posting.md`          |
 
 ---
 
@@ -612,6 +620,13 @@ SENTRY_DSN=""
 - [x] Chỉ còn 3 nền tảng: YouTube, Facebook, TikTok — xoá Instagram, X, Telegram, WhatsApp
 - [x] Thêm TikTok: OAuth adapter (web) + TikTokService sync (api)
 - [x] Gỡ scope ghi (youtube.upload, pages_manage_posts) — chỉ xin quyền đọc
+
+**Đăng bài qua extension:**
+- [x] Schema Post/PostTarget/MediaAsset/BrowserDevice + API web (/posts, /media, /devices, /ext/*)
+- [x] UI /posts, /posts/new, /posts/:id, /posts/devices (ghép trình duyệt, nhắc lịch)
+- [x] Extension MV3 (apps/extension) + kịch bản FB/TikTok/YouTube (packages/shared/src/extension)
+- [x] Nhắc lịch + báo lỗi qua Telegram / Zalo OA (apps/api/src/modules/posts)
+- [ ] Kiểm chứng selector kịch bản trên tài khoản thật từng nền tảng
 
 **Còn lại:**
 - [ ] Nhập metrics thủ công + import CSV (Day 5.3)

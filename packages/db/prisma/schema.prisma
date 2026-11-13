@@ -248,24 +248,25 @@ model Tenant {
 
 // --- 1. User ---------------------------------------------------------------
 model User {
-  id             String     @id @default(cuid())
-  tenantId       String
-  departmentId   String?
-  email          String
-  password       String // bcrypt hash (xem CLAUDE.md §9 rule #1)
-  name           String
-  avatar         String?
-  phone          String?
-  position       String? // "Senior Editor", "Content Manager"
-  joinDate       DateTime?
-  terminateDate  DateTime?
+  id               String     @id @default(cuid())
+  tenantId         String
+  departmentId     String?
+  email            String
+  password         String // bcrypt hash (xem CLAUDE.md §9 rule #1)
+  name             String
+  avatar           String?
+  phone            String?
+  position         String? // "Senior Editor", "Content Manager"
+  joinDate         DateTime?
+  terminateDate    DateTime?
   // Kênh nhắc lịch đăng bài (xem PostReminderService)
-  telegramChatId String? // chat_id với bot nhắc việc (user /start bot để lấy)
-  zaloUserId     String? // user_id của follower Zalo OA
-  status         UserStatus @default(ACTIVE)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  deletedAt      DateTime?
+  telegramChatId   String? // chat_id với bot nhắc việc (user /start bot để lấy)
+  telegramLinkCode String?    @unique // mã liên kết tạm, xoá sau khi bot nhận /start
+  zaloUserId       String? // user_id của follower Zalo OA
+  status           UserStatus @default(ACTIVE)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  deletedAt        DateTime?
 
   tenant               Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   department           Department?               @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
@@ -828,22 +829,23 @@ model Post {
 
 // --- PostTarget: 1 bài × 1 kênh ---------------------------------------------
 model PostTarget {
-  id           String           @id @default(cuid())
-  tenantId     String
-  postId       String
-  channelId    String
-  status       PostTargetStatus @default(PENDING)
+  id                String           @id @default(cuid())
+  tenantId          String
+  postId            String
+  channelId         String
+  status            PostTargetStatus @default(PENDING)
   /// Tuỳ chọn riêng nền tảng: { privacy: 'public'|'private'|'unlisted', ... }
-  options      Json?
-  deviceId     String? // Trình duyệt đã claim
-  claimedAt    DateTime?
-  publishedAt  DateTime?
-  externalUrl  String? // Link bài sau khi đăng
-  errorMessage String?
-  attempts     Int              @default(0)
-  remindedAt   DateTime? // Đã gửi nhắc Telegram/Zalo lúc nào
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  options           Json?
+  deviceId          String? // Trình duyệt đã claim
+  claimedAt         DateTime?
+  publishedAt       DateTime?
+  externalUrl       String? // Link bài sau khi đăng
+  errorMessage      String?
+  attempts          Int              @default(0)
+  remindedAt        DateTime? // Đã gửi nhắc Telegram/Zalo lúc nào
+  failureNotifiedAt DateTime? // đã báo lỗi cho người tạo bài lúc nào
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   post    Post           @relation(fields: [postId], references: [id], onDelete: Cascade)

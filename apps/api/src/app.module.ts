@@ -8,6 +8,7 @@ import { RedisModule } from './lib/redis.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { KpiModule } from './modules/kpi/kpi.module';
 import { PlatformsModule } from './modules/platforms/platforms.module';
+import { PostsModule } from './modules/posts/posts.module';
 import { QueueModule } from './modules/queue/queue.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { QueueModule } from './modules/queue/queue.module';
     AlertsModule,
     KpiModule,
     PlatformsModule,
+    PostsModule,
     QueueModule,
   ],
   controllers: [],

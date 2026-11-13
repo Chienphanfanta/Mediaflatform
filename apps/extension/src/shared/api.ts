@@ -46,7 +46,8 @@ async function request<T>(
   } catch {
     throw new ApiError('NETWORK', `Không kết nối được server ${serverUrl}`, 0);
   }
-  const json = (await res.json().catch(() => null)) as Envelope<T> | null;
+  const json = (res.status === 204 ? null : await res.json().catch(() => null)) as Envelope<T> | null;
+  if (res.status === 204) return undefined as T;
   if (!json) throw new ApiError(`HTTP_${res.status}`, `Server trả lỗi HTTP ${res.status}`, res.status);
   if (!json.success) throw new ApiError(json.error.code, json.error.message, res.status);
   return json.data;
@@ -85,3 +86,5 @@ export const reportResult = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+export const unpairDevice = () => request<void>('/api/v1/ext/unpair', { method: 'POST' });

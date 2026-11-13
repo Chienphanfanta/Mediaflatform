@@ -19,6 +19,7 @@ import {
   getMe,
   getQueue,
   reportResult,
+  unpairDevice,
 } from '../shared/api';
 import {
   appendLog,
@@ -390,6 +391,10 @@ async function setBadge(count: number | null): Promise<void> {
 }
 
 async function unpair(): Promise<void> {
+  // Báo server thu hồi token (bỏ qua lỗi mạng — vẫn xoá token cục bộ)
+  await unpairDevice().catch(() => undefined);
+  const job = await getCurrentJob();
+  if (job) await chrome.tabs.remove(job.tabId).catch(() => undefined);
   await removeLocal(['deviceToken', 'me', 'lastError', 'flows', 'flowsFetchedAt']);
   await setCurrentJob(null);
   await setBadge(null);
