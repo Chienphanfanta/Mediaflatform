@@ -19,6 +19,7 @@ const ROUTE_RBAC: Array<{ pattern: RegExp; minRole: EffectiveRole }> = [
   { pattern: /^\/reports(\/|$)/, minRole: 'MANAGER' },
   { pattern: /^\/alerts(\/|$)/, minRole: 'VIEWER' },
   { pattern: /^\/channels(\/|$)/, minRole: 'STAFF' },
+  { pattern: /^\/posts(\/|$)/, minRole: 'STAFF' },
   { pattern: /^\/analytics(\/|$)/, minRole: 'VIEWER' },
   { pattern: /^\/dashboard(\/|$)/, minRole: 'VIEWER' },
 ];
@@ -30,6 +31,8 @@ const PUBLIC_PREFIXES = [
   '/forbidden',
   '/offline',
   '/api/auth',
+  // Browser extension: xác thực bằng device token trong route (withDevice), không dùng session
+  '/api/v1/ext/',
   '/manifest.json',
   '/icons',
   '/sw.js',

@@ -46,6 +46,41 @@ services:
       timeout: 3s
       retries: 5
 
+  # MinIO — lưu ảnh/video của bài đăng (S3-compatible).
+  # Console: http://localhost:9001 (user/pass = MINIO_ROOT_USER / MINIO_ROOT_PASSWORD)
+  minio:
+    image: minio/minio:latest
+    container_name: media-ops-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Tạo bucket lần đầu (chạy xong tự thoát). Bucket private — truy cập qua presigned URL.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-post-media}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" && mc mb --ignore-existing "local/$$S3_BUCKET" && mc anonymous set none "local/$$S3_BUCKET"
+
   # Optional — Mailpit cho test email (Resend API thật cần internet + key).
   # Uncomment khi cần debug HTML template.
   # mailpit:
@@ -59,3 +94,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  minio-data:

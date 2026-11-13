@@ -161,6 +161,36 @@ enum SyncStatus {
   SKIPPED // rate-limited, quota-paused, token-expired
 }
 
+// --- Đăng bài qua browser extension ---
+enum PostStatus {
+  DRAFT // Đang soạn, extension chưa thấy
+  SCHEDULED // Đã lên lịch / chờ đăng — extension sẽ lấy khi đến giờ
+  PUBLISHING // Ít nhất 1 target đang đăng
+  PUBLISHED // Tất cả target đăng thành công
+  PARTIAL // Một số target thành công, một số lỗi
+  FAILED // Tất cả target lỗi
+  CANCELLED
+}
+
+enum PostTargetStatus {
+  PENDING // Chờ extension nhận
+  PUBLISHING // Extension đã claim, đang thao tác trên trình duyệt
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum BrowserType {
+  CHROME
+  COCCOC
+  OTHER
+}
+
 enum KPIScope {
   PER_CHANNEL // KPI giao cho 1 channel (Channel.id required)
   PER_EMPLOYEE // KPI tổng giao cho nhân viên (sum tất cả channels employee phụ trách)
@@ -207,6 +237,10 @@ model Tenant {
   alerts      Alert[]
   kpis        KPI[]
   departments Department[]
+  posts       Post[]
+  postTargets PostTarget[]
+  mediaAssets MediaAsset[]
+  browsers    BrowserDevice[]
 
   @@index([slug])
   @@index([status])
@@ -214,21 +248,24 @@ model Tenant {
 
 // --- 1. User ---------------------------------------------------------------
 model User {
-  id            String     @id @default(cuid())
-  tenantId      String
-  departmentId  String?
-  email         String
-  password      String // bcrypt hash (xem CLAUDE.md §9 rule #1)
-  name          String
-  avatar        String?
-  phone         String?
-  position      String? // "Senior Editor", "Content Manager"
-  joinDate      DateTime?
-  terminateDate DateTime?
-  status        UserStatus @default(ACTIVE)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  deletedAt     DateTime?
+  id             String     @id @default(cuid())
+  tenantId       String
+  departmentId   String?
+  email          String
+  password       String // bcrypt hash (xem CLAUDE.md §9 rule #1)
+  name           String
+  avatar         String?
+  phone          String?
+  position       String? // "Senior Editor", "Content Manager"
+  joinDate       DateTime?
+  terminateDate  DateTime?
+  // Kênh nhắc lịch đăng bài (xem PostReminderService)
+  telegramChatId String? // chat_id với bot nhắc việc (user /start bot để lấy)
+  zaloUserId     String? // user_id của follower Zalo OA
+  status         UserStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
 
   tenant               Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   department           Department?               @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
@@ -239,6 +276,9 @@ model User {
   notificationSettings UserNotificationSettings?
   kpis                 KPI[]                     @relation("EmployeeKPIs")
   assignedKpis         KPI[]                     @relation("KPIAssignedBy")
+  posts                Post[]                    @relation("PostCreatedBy")
+  mediaAssets          MediaAsset[]              @relation("MediaUploadedBy")
+  browsers             BrowserDevice[]
 
   // Email unique trong scope tenant (không global)
   @@unique([tenantId, email])
@@ -337,12 +377,13 @@ model Channel {
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
 
-  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  analytics  Analytics[]
-  alerts     Alert[]
-  groups     ChannelGroup[]
-  ownerships ChannelOwnership[]
-  kpis       KPI[]
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  analytics   Analytics[]
+  alerts      Alert[]
+  groups      ChannelGroup[]
+  ownerships  ChannelOwnership[]
+  kpis        KPI[]
+  postTargets PostTarget[]
 
   // accountId+platform unique trong scope tenant (cho phép 2 tenants connect cùng 1 kênh thật)
   @@unique([tenantId, platform, accountId])
@@ -525,16 +566,16 @@ model Alert {
 // PER_CHANNEL: aggregate Analytics của 1 channel trong period.
 // PER_EMPLOYEE: aggregate Analytics của tất cả channels mà employee là owner.
 model KPI {
-  id        String   @id @default(cuid())
-  tenantId  String
+  id       String @id @default(cuid())
+  tenantId String
 
   scope      KPIScope
   channelId  String? // null khi scope = PER_EMPLOYEE
   employeeId String
 
   periodType  PeriodType
-  periodStart DateTime @db.Date
-  periodEnd   DateTime @db.Date
+  periodStart DateTime   @db.Date
+  periodEnd   DateTime   @db.Date
 
   // Targets — set null cho target không áp dụng
   targetFollowers     Int?
@@ -700,14 +741,14 @@ model SyncLog {
 // Khi browser revoke (user uninstall PWA, clear data, hoặc subscription expire):
 // web-push trả status 410 Gone → caller xoá row qua endpoint.
 model UserDevice {
-  id        String   @id @default(cuid())
-  userId    String
-  endpoint  String   @unique // FCM/Mozilla/Apple push endpoint URL
-  p256dh    String // ECDH public key (base64url)
-  auth      String // Auth secret (base64url)
-  userAgent String? // Phân biệt thiết bị trong UI settings
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String   @unique // FCM/Mozilla/Apple push endpoint URL
+  p256dh     String // ECDH public key (base64url)
+  auth       String // Auth secret (base64url)
+  userAgent  String? // Phân biệt thiết bị trong UI settings
   lastSeenAt DateTime @default(now())
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -730,8 +771,8 @@ model UserNotificationSettings {
   workflowRejected  Boolean @default(true) // Bài bị từ chối
   workflowSubmitted Boolean @default(true) // Có bài mới chờ duyệt (Manager)
   // Multi-channel preferences (in-app, email, push)
-  inAppEnabled Boolean @default(true)
-  emailEnabled Boolean @default(true)
+  inAppEnabled      Boolean @default(true)
+  emailEnabled      Boolean @default(true)
 
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -753,3 +794,130 @@ model UserNotificationSettings {
 // V1-REMOVED   @@index([userId])
 // V1-REMOVED   @@index([toStatus, createdAt]) // Dashboard: bài bị reject gần đây
 // V1-REMOVED }
+
+// =============================================================================
+// ĐĂNG BÀI QUA BROWSER EXTENSION (Chrome / Cốc Cốc)
+// =============================================================================
+// Luồng: web soạn Post → mỗi kênh đích là 1 PostTarget (PENDING) → extension
+// trên trình duyệt của nhân viên phụ trách kênh claim target khi đến giờ →
+// tự thao tác trang đăng bài của nền tảng → báo kết quả (PUBLISHED/FAILED).
+
+// --- Post ------------------------------------------------------------------
+model Post {
+  id          String     @id @default(cuid())
+  tenantId    String
+  createdById String
+  title       String? // Bắt buộc với YouTube (tiêu đề video); FB/TikTok bỏ qua
+  caption     String // Nội dung/mô tả
+  hashtags    String[]
+  scheduledAt DateTime? // null = đăng ngay khi extension online
+  status      PostStatus @default(DRAFT)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User         @relation("PostCreatedBy", fields: [createdById], references: [id])
+  media     PostMedia[]
+  targets   PostTarget[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, scheduledAt])
+  @@index([tenantId, createdById])
+}
+
+// --- PostTarget: 1 bài × 1 kênh ---------------------------------------------
+model PostTarget {
+  id           String           @id @default(cuid())
+  tenantId     String
+  postId       String
+  channelId    String
+  status       PostTargetStatus @default(PENDING)
+  /// Tuỳ chọn riêng nền tảng: { privacy: 'public'|'private'|'unlisted', ... }
+  options      Json?
+  deviceId     String? // Trình duyệt đã claim
+  claimedAt    DateTime?
+  publishedAt  DateTime?
+  externalUrl  String? // Link bài sau khi đăng
+  errorMessage String?
+  attempts     Int              @default(0)
+  remindedAt   DateTime? // Đã gửi nhắc Telegram/Zalo lúc nào
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  post    Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  channel Channel        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  device  BrowserDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@unique([postId, channelId])
+  @@index([tenantId, status])
+  @@index([channelId, status])
+  @@index([status, remindedAt])
+}
+
+// --- MediaAsset: file lưu trên MinIO ----------------------------------------
+model MediaAsset {
+  id           String    @id @default(cuid())
+  tenantId     String
+  uploadedById String
+  objectKey    String    @unique // key trong bucket MinIO: {tenantId}/{yyyy}/{mm}/{id}-{fileName}
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  type         MediaType
+  uploadedAt   DateTime? // null = mới cấp URL upload, chưa xác nhận xong
+  createdAt    DateTime  @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy User        @relation("MediaUploadedBy", fields: [uploadedById], references: [id])
+  posts      PostMedia[]
+
+  @@index([tenantId, createdAt])
+}
+
+model PostMedia {
+  postId  String
+  mediaId String
+  order   Int    @default(0)
+
+  post  Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  media MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@id([postId, mediaId])
+  @@index([mediaId])
+}
+
+// --- BrowserDevice: trình duyệt đã cài extension ----------------------------
+// Extension xác thực bằng device token (Bearer). DB chỉ lưu SHA-256 của token.
+model BrowserDevice {
+  id               String      @id @default(cuid())
+  tenantId         String
+  userId           String
+  name             String // "Máy Lan - Cốc Cốc"
+  browser          BrowserType @default(CHROME)
+  os               String?
+  extensionVersion String?
+  tokenHash        String      @unique
+  lastSeenAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime    @default(now())
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targets PostTarget[]
+
+  @@index([tenantId, userId])
+}
+
+// --- DevicePairCode: mã ghép extension (6 ký tự, sống 10 phút) ---------------
+// Global (không tenantId) — lookup bằng code trước khi biết tenant.
+model DevicePairCode {
+  code      String   @id
+  tenantId  String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}

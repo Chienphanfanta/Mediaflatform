@@ -19,6 +19,10 @@ const TENANT_SCOPED_MODELS = new Set([
   'Alert',
   'KPI',
   'Department',
+  'Post',
+  'PostTarget',
+  'MediaAsset',
+  'BrowserDevice',
 ]);
 
 const READ_OPS = new Set([

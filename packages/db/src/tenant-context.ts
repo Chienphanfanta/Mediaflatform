@@ -22,7 +22,12 @@ export type TenantContext = {
   bypass?: boolean;
 };
 
-const storage = new AsyncLocalStorage<TenantContext>();
+// Singleton trên globalThis: Next.js có thể nạp module này nhiều lần (mỗi route
+// bundle / HMR một bản) trong khi Prisma client được cache trên globalThis.
+// Nếu mỗi bản có AsyncLocalStorage riêng, extension (gắn vào client cũ) sẽ đọc
+// nhầm storage → "called without tenant context" dù đã bọc withTenant/withTenantBypass.
+const g = globalThis as unknown as { __tenantStorage?: AsyncLocalStorage<TenantContext> };
+const storage = (g.__tenantStorage ??= new AsyncLocalStorage<TenantContext>());
 
 export function getTenantContext(): TenantContext | undefined {
   return storage.getStore();
@@ -36,7 +41,9 @@ export function withTenant<T>(
   context: TenantContext,
   fn: () => T | Promise<T>,
 ): Promise<T> {
-  return Promise.resolve(storage.run(context, fn) as T | Promise<T>);
+  // `await` BÊN TRONG storage.run: Prisma query là PrismaPromise lười (chỉ chạy khi
+  // được await) — nếu trả promise ra ngoài rồi mới await thì query chạy NGOÀI context.
+  return storage.run(context, async () => await fn());
 }
 
 /**
@@ -49,7 +56,5 @@ export function withTenant<T>(
  * KHÔNG dùng trong route handler thường — sẽ leak data cross-tenant.
  */
 export function withTenantBypass<T>(fn: () => T | Promise<T>): Promise<T> {
-  return Promise.resolve(
-    storage.run({ tenantId: '__bypass__', bypass: true }, fn) as T | Promise<T>,
-  );
+  return storage.run({ tenantId: '__bypass__', bypass: true }, async () => await fn());
 }
