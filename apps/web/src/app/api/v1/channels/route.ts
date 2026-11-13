@@ -10,6 +10,7 @@ import { withAuth } from '@/lib/with-auth';
 import { fail, ok } from '@/lib/api-response';
 import { hasPermission } from '@/lib/rbac';
 import { createChannelSchema } from '@/lib/schemas/channels';
+import { PLATFORMS } from '@/lib/platform';
 
 export const GET = withAuth(
   async ({ req, user }) => {
@@ -30,7 +31,7 @@ export const GET = withAuth(
     }
     if (
       platform &&
-      ['YOUTUBE', 'FACEBOOK', 'INSTAGRAM', 'X', 'TELEGRAM', 'WHATSAPP'].includes(platform)
+      (PLATFORMS as string[]).includes(platform)
     ) {
       where.platform = platform as Prisma.ChannelWhereInput['platform'];
     }

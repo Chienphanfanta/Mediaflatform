@@ -13,29 +13,14 @@ import {
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/with-auth';
 import { fail, ok } from '@/lib/api-response';
+import { PLATFORMS, PLATFORM_HEX } from '@/lib/platform';
 import { summaryQuerySchema } from '@/lib/schemas/analytics';
 import type {
   AnalyticsSummaryResponse,
   PlatformBreakdownItem,
 } from '@/lib/types/analytics-summary';
 
-const PLATFORMS: Platform[] = [
-  'YOUTUBE',
-  'FACEBOOK',
-  'INSTAGRAM',
-  'X',
-  'TELEGRAM',
-  'WHATSAPP',
-];
-
-const PLATFORM_COLORS: Record<Platform, string> = {
-  YOUTUBE: '#FF0000',
-  FACEBOOK: '#1877F2',
-  INSTAGRAM: '#E1306C',
-  X: '#0F172A',
-  TELEGRAM: '#8B5CF6', // tím theo user spec (thay màu mặc định Telegram blue)
-  WHATSAPP: '#25D366',
-};
+const PLATFORM_COLORS = PLATFORM_HEX;
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100;

@@ -14,7 +14,7 @@
 // Worker dùng debounce qua Redis SET NX EX 5min để chỉ run 1 lần dù 100 sync xong.
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { Platform, Prisma, SyncStatus } from '@prisma/client';
+import { Platform, SyncStatus } from '@prisma/client';
 import type { Job } from 'bullmq';
 
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -23,8 +23,7 @@ import { AlertEngineService } from '../../alerts/alert-engine.service';
 import { AlertsService } from '../../alerts/alerts.service';
 import { NotificationService } from '../../alerts/notification.service';
 import { MetaService } from '../../platforms/meta.service';
-import { TelegramService } from '../../platforms/telegram.service';
-import { TwitterService } from '../../platforms/twitter.service';
+import { TikTokService } from '../../platforms/tiktok.service';
 import { YouTubeService } from '../../platforms/youtube.service';
 import { JOB_TIMEOUT_MS, QUEUE_NAMES, WORKER_OPTIONS } from '../queues.constants';
 import { JobLogService } from '../services/job-log.service';
@@ -54,8 +53,7 @@ export class AnalyticsSyncWorker extends WorkerHost {
     private readonly youtubeQuota: YouTubeQuotaService,
     private readonly youtube: YouTubeService,
     private readonly meta: MetaService,
-    private readonly twitter: TwitterService,
-    private readonly telegram: TelegramService,
+    private readonly tiktok: TikTokService,
   ) {
     super();
   }
@@ -141,7 +139,7 @@ export class AnalyticsSyncWorker extends WorkerHost {
       // Dispatch
       let result: { daysFetched: number; rowsUpserted: number; skippedReason?: string };
       try {
-        result = await this.dispatch(channelId, channel.tenantId, platform);
+        result = await this.dispatch(channelId, platform);
       } catch (err) {
         const msg = (err as Error).message;
         await this.syncLog.log({
@@ -217,7 +215,6 @@ export class AnalyticsSyncWorker extends WorkerHost {
 
   private async dispatch(
     channelId: string,
-    tenantId: string,
     platform: Platform,
   ): Promise<{ daysFetched: number; rowsUpserted: number; skippedReason?: string }> {
     switch (platform) {
@@ -237,49 +234,14 @@ export class AnalyticsSyncWorker extends WorkerHost {
           skippedReason: r.skippedReason,
         };
       }
-      case Platform.INSTAGRAM: {
-        const r = await this.meta.syncInstagramInsights(channelId);
+      case Platform.TIKTOK: {
+        const r = await this.tiktok.syncAccountStats(channelId);
         return {
           daysFetched: r.daysFetched,
           rowsUpserted: r.rowsUpserted,
           skippedReason: r.skippedReason,
         };
       }
-      case Platform.X: {
-        const r = await this.twitter.syncTweetMetrics(channelId);
-        return {
-          daysFetched: r.daysAggregated,
-          rowsUpserted: r.rowsUpserted,
-          skippedReason: r.skippedReason,
-        };
-      }
-      case Platform.TELEGRAM: {
-        // Telegram chỉ trả memberCount — đẩy vào Analytics row hôm nay
-        const r = await this.telegram.syncChannelStats(channelId);
-        const today = startOfUTCDay(new Date());
-        await this.prisma.analytics.upsert({
-          where: { channelId_date: { channelId, date: today } },
-          create: {
-            tenantId,
-            channelId,
-            date: today,
-            platform: Platform.TELEGRAM,
-            subscribers: r.memberCount,
-            raw: { memberCount: r.memberCount, chatTitle: r.chatTitle } as Prisma.InputJsonValue,
-          },
-          update: {
-            subscribers: r.memberCount,
-            raw: { memberCount: r.memberCount, chatTitle: r.chatTitle } as Prisma.InputJsonValue,
-          },
-        });
-        return { daysFetched: 1, rowsUpserted: 1 };
-      }
-      case Platform.WHATSAPP:
-        return {
-          daysFetched: 0,
-          rowsUpserted: 0,
-          skippedReason: 'whatsapp-no-analytics',
-        };
       default:
         throw new Error(`Platform ${platform} không support analytics sync`);
     }
@@ -374,11 +336,6 @@ function unhealthySkipReason(status: string): string | null {
   return null;
 }
 
-function startOfUTCDay(d: Date): Date {
-  const x = new Date(d);
-  x.setUTCHours(0, 0, 0, 0);
-  return x;
-}
 
 function runWithTimeout<T>(ms: number, fn: () => Promise<T>): Promise<T> {
   return Promise.race([

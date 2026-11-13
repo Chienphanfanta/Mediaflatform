@@ -1,4 +1,4 @@
-// HTTP client cho Meta Graph API (Facebook + Instagram).
+// HTTP client cho Meta Graph API (Facebook Pages).
 // Wrap fetch + parse error structure đặc thù Meta:
 //   {"error":{"message":"...","type":"OAuthException","code":190,"error_subcode":460}}
 //

@@ -17,9 +17,7 @@ import type {
 const VIEW_PLATFORMS: Array<keyof Omit<ViewsByDay, 'date'>> = [
   'YOUTUBE',
   'FACEBOOK',
-  'INSTAGRAM',
-  'TELEGRAM',
-  'WHATSAPP',
+  'TIKTOK',
 ];
 
 function healthFromStatus(s: ChannelStatus): ChannelHealthItem['health'] {
@@ -48,9 +46,7 @@ function emptyDay(date: string): ViewsByDay {
     date,
     YOUTUBE: 0,
     FACEBOOK: 0,
-    INSTAGRAM: 0,
-    TELEGRAM: 0,
-    WHATSAPP: 0,
+    TIKTOK: 0,
   };
 }
 

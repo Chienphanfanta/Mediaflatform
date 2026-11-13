@@ -1,14 +1,7 @@
 // Zod schemas for /api/v1/channels CRUD + ownership endpoints.
 import { z } from 'zod';
 
-const PLATFORM_VALUES = [
-  'YOUTUBE',
-  'FACEBOOK',
-  'INSTAGRAM',
-  'X',
-  'TELEGRAM',
-  'WHATSAPP',
-] as const;
+const PLATFORM_VALUES = ['YOUTUBE', 'FACEBOOK', 'TIKTOK'] as const;
 
 const STATUS_VALUES = ['ACTIVE', 'INACTIVE', 'ARCHIVED'] as const;
 

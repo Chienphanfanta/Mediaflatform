@@ -28,7 +28,7 @@ const MOCK_ALERTS = [
   },
   {
     id: '3',
-    title: 'Instagram: API rate limit exceeded',
+    title: 'TikTok: API rate limit exceeded',
     time: '3 ngày trước',
     unread: false,
   },

@@ -1,8 +1,6 @@
 // GET /api/v1/platforms/:platform/connect?groupId=xxx
 // Bắt đầu OAuth flow. Set HttpOnly cookie chứa state + (optional) PKCE verifier,
 // redirect 302 đến OAuth URL của platform.
-//
-// Telegram: trả 400 vì cần POST bot token — UI nên detect trước và route khác.
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -24,12 +22,6 @@ export const GET = withAuth<{ platform: string }>(
         status: 404,
       });
     }
-    if (platform === 'TELEGRAM') {
-      return fail('TELEGRAM_USES_BOT_TOKEN', 'Telegram dùng bot token — POST /api/v1/platforms/telegram/connect-bot', {
-        status: 400,
-      });
-    }
-
     const url = new URL(req.url);
     const parsed = querySchema.safeParse({ groupId: url.searchParams.get('groupId') });
     if (!parsed.success) {

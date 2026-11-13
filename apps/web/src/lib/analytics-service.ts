@@ -24,6 +24,7 @@ import {
 
 import { prisma } from './prisma';
 import { cached } from './redis';
+import { PLATFORM_HEX } from './platform';
 
 // ============================================================
 // TYPES
@@ -123,14 +124,7 @@ const TTL = {
   GROWTH: 60 * 60, // 1h
 } as const;
 
-const PLATFORM_COLORS: Record<Platform, string> = {
-  YOUTUBE: '#FF0000',
-  FACEBOOK: '#1877F2',
-  INSTAGRAM: '#E1306C',
-  X: '#0F172A',
-  TELEGRAM: '#229ED9',
-  WHATSAPP: '#25D366',
-};
+const PLATFORM_COLORS = PLATFORM_HEX;
 
 const METRIC_FIELD: Record<MetricKey, string> = {
   views: 'views',

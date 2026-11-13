@@ -15,24 +15,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCompact } from '@/lib/format';
 import type { ViewsByDay } from '@/lib/types/dashboard';
+import { PLATFORM_HEX, PLATFORM_LABEL } from '@/lib/platform';
 
 type Props = { data?: ViewsByDay[]; isLoading: boolean };
 
-const PLATFORM_COLORS: Record<keyof Omit<ViewsByDay, 'date'>, string> = {
-  YOUTUBE: '#FF0000',
-  FACEBOOK: '#1877F2',
-  INSTAGRAM: '#E1306C',
-  TELEGRAM: '#229ED9',
-  WHATSAPP: '#25D366',
-};
+const PLATFORM_COLORS: Record<keyof Omit<ViewsByDay, 'date'>, string> = PLATFORM_HEX;
 
-const PLATFORM_LABEL: Record<string, string> = {
-  YOUTUBE: 'YouTube',
-  FACEBOOK: 'Facebook',
-  INSTAGRAM: 'Instagram',
-  TELEGRAM: 'Telegram',
-  WHATSAPP: 'WhatsApp',
-};
+function labelOf(key: string): string {
+  return (PLATFORM_LABEL as Record<string, string>)[key] ?? key;
+}
 
 export function ViewsChart({ data, isLoading }: Props) {
   return (
@@ -68,11 +59,11 @@ export function ViewsChart({ data, isLoading }: Props) {
                   fontSize: 12,
                 }}
                 labelFormatter={(d: string) => format(parseISO(d), 'EEEE, dd/MM/yyyy')}
-                formatter={(v: number, name: string) => [formatCompact(v), PLATFORM_LABEL[name] ?? name]}
+                formatter={(v: number, name: string) => [formatCompact(v), labelOf(name)]}
               />
               <Legend
                 wrapperStyle={{ fontSize: 12 }}
-                formatter={(v) => PLATFORM_LABEL[v] ?? v}
+                formatter={(v: string) => labelOf(v)}
               />
               {(Object.keys(PLATFORM_COLORS) as Array<keyof typeof PLATFORM_COLORS>).map((p) => (
                 <Line

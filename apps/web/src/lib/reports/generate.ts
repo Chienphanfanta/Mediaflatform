@@ -6,6 +6,7 @@ import { Prisma, type Platform } from '@prisma/client';
 import { format, startOfDay, subDays } from 'date-fns';
 
 import { prisma } from '@/lib/prisma';
+import { PLATFORMS } from '@/lib/platform';
 import type { SessionUser } from '@/lib/rbac';
 import type { GenerateReportInput } from '@/lib/schemas/reports';
 import type {
@@ -16,15 +17,6 @@ import type {
   PeriodMeta,
   ReportData,
 } from '@/lib/types/reports';
-
-const PLATFORMS: Platform[] = [
-  'YOUTUBE',
-  'FACEBOOK',
-  'INSTAGRAM',
-  'X',
-  'TELEGRAM',
-  'WHATSAPP',
-];
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100;
