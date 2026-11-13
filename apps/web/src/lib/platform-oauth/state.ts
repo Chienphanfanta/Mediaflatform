@@ -11,7 +11,7 @@ export type FlowState = {
   redirectUri: string;
   /** Random — dùng làm `state` query param trong OAuth URL (anti-CSRF). */
   nonce: string;
-  /** PKCE verifier (chỉ X). */
+  /** PKCE verifier (nếu platform dùng PKCE). */
   codeVerifier?: string;
   /** Unix ms expiry. */
   exp: number;

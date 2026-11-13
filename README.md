@@ -1,6 +1,6 @@
 # Media Ops Platform
 
-Web quản lý nhân sự và đa kênh truyền thông — YouTube, Facebook, Instagram, Telegram, X, WhatsApp.
+Web quản lý nhân sự và theo dõi tăng trưởng kênh truyền thông — YouTube, Facebook, TikTok.
 
 ## Tech Stack
 
@@ -65,9 +65,6 @@ npm run dev:api    # http://localhost:4000
 
 ## Kênh tích hợp
 
-- [ ] YouTube Data API v3
-- [ ] Facebook Graph API
-- [ ] Instagram Graph API
-- [ ] Telegram Bot API
-- [ ] X (Twitter) API v2
-- [ ] WhatsApp Business API
+- [x] YouTube Data API v3 + YouTube Analytics API
+- [x] Facebook Graph API (Page Insights)
+- [x] TikTok API v2 (Login Kit + Display API)

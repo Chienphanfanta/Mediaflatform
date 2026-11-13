@@ -14,10 +14,7 @@ export type ViewsByDay = {
   date: string; // YYYY-MM-DD
   YOUTUBE: number;
   FACEBOOK: number;
-  INSTAGRAM: number;
-  TELEGRAM: number;
-  WHATSAPP: number;
-  // V1 X removed
+  TIKTOK: number;
 };
 
 export type ChannelHealthItem = {

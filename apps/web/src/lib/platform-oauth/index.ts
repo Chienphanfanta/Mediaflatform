@@ -1,32 +1,18 @@
 // PlatformOAuthService — entry point. Dispatch theo platform enum/string.
 import { Platform } from '@prisma/client';
 import type { OAuthAdapter } from './base';
-import {
-  facebookAdapter,
-  instagramAdapter,
-  telegramAdapter,
-  whatsappAdapter,
-  xAdapter,
-  youtubeAdapter,
-} from './adapters';
+import { facebookAdapter, tiktokAdapter, youtubeAdapter } from './adapters';
 
 export const ADAPTERS: Record<Platform, OAuthAdapter> = {
   YOUTUBE: youtubeAdapter,
   FACEBOOK: facebookAdapter,
-  INSTAGRAM: instagramAdapter,
-  X: xAdapter,
-  TELEGRAM: telegramAdapter,
-  WHATSAPP: whatsappAdapter,
+  TIKTOK: tiktokAdapter,
 };
 
 const URL_TO_PLATFORM: Record<string, Platform> = {
   youtube: Platform.YOUTUBE,
   facebook: Platform.FACEBOOK,
-  instagram: Platform.INSTAGRAM,
-  x: Platform.X,
-  twitter: Platform.X, // alias
-  telegram: Platform.TELEGRAM,
-  whatsapp: Platform.WHATSAPP,
+  tiktok: Platform.TIKTOK,
 };
 
 export function platformFromSlug(slug: string): Platform | null {

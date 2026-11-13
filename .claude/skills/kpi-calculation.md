@@ -17,7 +17,7 @@ KPI luôn gắn với 1 `employeeId`. `scope` quyết định channels nào tín
 
 **Use case:**
 - `PER_CHANNEL`: chỉ tiêu cụ thể cho YouTube channel của contentManager (vd: 1.5M views/tháng).
-- `PER_EMPLOYEE`: chỉ tiêu tổng cho contentManager — sum metrics across YouTube + Instagram cùng owner.
+- `PER_EMPLOYEE`: chỉ tiêu tổng cho contentManager — sum metrics across YouTube + TikTok cùng owner.
 
 **Rule:** Validate ở `createKpiSchema`:
 ```ts

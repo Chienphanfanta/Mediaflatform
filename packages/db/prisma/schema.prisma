@@ -64,10 +64,7 @@ enum PermissionAction {
 enum Platform {
   YOUTUBE
   FACEBOOK
-  INSTAGRAM
-  X
-  TELEGRAM
-  WHATSAPP
+  TIKTOK
 }
 
 enum ChannelStatus {

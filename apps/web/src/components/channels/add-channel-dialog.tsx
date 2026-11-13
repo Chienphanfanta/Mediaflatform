@@ -48,13 +48,10 @@ import { PLATFORMS, PLATFORM_DOT, PLATFORM_LABEL } from '@/lib/platform';
 const PLATFORM_NOTE: Record<Platform, string> = {
   YOUTUBE: 'OAuth 2.0 — cần Google account quản lý channel',
   FACEBOOK: 'OAuth 2.0 — cần admin Facebook Page',
-  INSTAGRAM: 'OAuth 2.0 — IG Business Account đã link Facebook Page',
-  X: 'OAuth 2.0 + PKCE — cần X account',
-  TELEGRAM: 'Bot token từ @BotFather — không cần OAuth',
-  WHATSAPP: 'WhatsApp Business — Phone number ID + access token',
+  TIKTOK: 'OAuth 2.0 — cần đăng nhập tài khoản TikTok',
 };
 
-const OAUTH_PLATFORMS: Platform[] = ['YOUTUBE', 'FACEBOOK', 'INSTAGRAM', 'X'];
+const OAUTH_PLATFORMS: Platform[] = ['YOUTUBE', 'FACEBOOK', 'TIKTOK'];
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -358,16 +355,6 @@ function Step1PickPlatform({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="font-semibold">{PLATFORM_LABEL[p]}</span>
-              {p === 'TELEGRAM' && (
-                <Badge variant="outline" className="text-[10px]">
-                  Bot
-                </Badge>
-              )}
-              {p === 'WHATSAPP' && (
-                <Badge variant="outline" className="text-[10px]">
-                  Manual
-                </Badge>
-              )}
             </div>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {PLATFORM_NOTE[p]}
@@ -394,10 +381,7 @@ function Step2ChannelInfo({
   const accountIdLabel: Record<Platform, string> = {
     YOUTUBE: 'Channel ID (UCxxx...)',
     FACEBOOK: 'Page ID',
-    INSTAGRAM: 'IG User ID (số)',
-    X: 'X User ID',
-    TELEGRAM: 'Chat ID (-100...)',
-    WHATSAPP: 'Phone Number ID',
+    TIKTOK: 'TikTok open_id (tự điền khi kết nối OAuth)',
   };
 
   return (
@@ -747,9 +731,7 @@ function Step4Review({
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              {form.platform === 'TELEGRAM'
-                ? 'Telegram: bot token đã có sẵn → manual create. Để bot fetch metrics, gán bot làm admin trong channel.'
-                : 'Manual create — sync API sẽ wire sau từ trang chi tiết.'}
+              Manual create — sync API sẽ wire sau từ trang chi tiết.
             </p>
             <Button onClick={onManualSave} disabled={isPending} className="w-full">
               {isPending ? (

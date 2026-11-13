@@ -506,27 +506,26 @@ async function seedChannels(
     },
   });
 
-  // --- 3. Instagram (PRIMARY: contentManager, SECONDARY: analyst) ---
-  const instagram = await prisma.channel.create({
+  // --- 3. TikTok chính (PRIMARY: contentManager, SECONDARY: analyst) ---
+  const tiktok = await prisma.channel.create({
     data: {
       tenantId,
-      name: 'Company Instagram',
-      platform: Platform.INSTAGRAM,
-      accountId: faker.string.numeric(17),
-      externalUrl: 'https://instagram.com/companyofficial',
-      description: 'Behind-the-scenes, lifestyle content',
+      name: 'Company TikTok',
+      platform: Platform.TIKTOK,
+      accountId: '-000' + faker.string.alphanumeric(28),
+      externalUrl: 'https://www.tiktok.com/@companyofficial',
+      description: 'Video ngắn behind-the-scenes, lifestyle',
       category: 'Lifestyle',
       accessToken: 'SEED_DUMMY_NOT_ENCRYPTED',
-      tokenExpiresAt: hoursFromNow(24 * 60),
+      refreshToken: 'SEED_DUMMY_NOT_ENCRYPTED',
+      tokenExpiresAt: hoursFromNow(24),
       status: ChannelStatus.ACTIVE,
       metadata: {
-        igUserId: faker.string.numeric(17),
         username: 'companyofficial',
-        linkedFacebookPageId: facebook.accountId,
-        accountType: 'BUSINESS',
+        displayName: 'Company Official',
         followersCount: faker.number.int({ min: 20_000, max: 500_000 }),
-        followsCount: faker.number.int({ min: 100, max: 1_000 }),
-        mediaCount: faker.number.int({ min: 100, max: 5_000 }),
+        likesCount: faker.number.int({ min: 100_000, max: 5_000_000 }),
+        videoCount: faker.number.int({ min: 100, max: 2_000 }),
       },
       groups: { create: { groupId: groups.contentGroup.id } },
       ownerships: {
@@ -546,23 +545,26 @@ async function seedChannels(
     },
   });
 
-  // --- 4. Telegram (PRIMARY: contentStaff1) ---
-  const telegram = await prisma.channel.create({
+  // --- 4. TikTok tin nhanh (PRIMARY: contentStaff1) ---
+  const tiktokNews = await prisma.channel.create({
     data: {
       tenantId,
-      name: 'Company Telegram Channel',
-      platform: Platform.TELEGRAM,
-      accountId: '-100' + faker.string.numeric(10),
-      externalUrl: 'https://t.me/companyofficial',
-      description: 'Tin tức nhanh + thông báo nội bộ',
+      name: 'Company TikTok Tin nhanh',
+      platform: Platform.TIKTOK,
+      accountId: '-000' + faker.string.alphanumeric(28),
+      externalUrl: 'https://www.tiktok.com/@companynews',
+      description: 'Tin tức nhanh dạng video ngắn',
       category: 'Tin tức',
       accessToken: 'SEED_DUMMY_NOT_ENCRYPTED',
-      tokenExpiresAt: null,
+      refreshToken: 'SEED_DUMMY_NOT_ENCRYPTED',
+      tokenExpiresAt: hoursFromNow(24),
       status: ChannelStatus.ACTIVE,
       metadata: {
-        chatId: faker.string.numeric(13),
-        title: 'Company Official',
-        memberCount: faker.number.int({ min: 5_000, max: 50_000 }),
+        username: 'companynews',
+        displayName: 'Company News',
+        followersCount: faker.number.int({ min: 5_000, max: 50_000 }),
+        likesCount: faker.number.int({ min: 10_000, max: 500_000 }),
+        videoCount: faker.number.int({ min: 50, max: 800 }),
       },
       groups: { create: { groupId: groups.contentGroup.id } },
       ownerships: {
@@ -575,24 +577,23 @@ async function seedChannels(
     },
   });
 
-  // --- 5. WhatsApp (INACTIVE — chưa kết nối token) ---
-  const whatsapp = await prisma.channel.create({
+  // --- 5. Facebook Page CSKH (INACTIVE — chưa kết nối token) ---
+  const facebookSupport = await prisma.channel.create({
     data: {
       tenantId,
-      name: 'Company WhatsApp Business',
-      platform: Platform.WHATSAPP,
+      name: 'Company Fanpage CSKH',
+      platform: Platform.FACEBOOK,
       accountId: faker.string.numeric(15),
-      externalUrl: 'https://wa.me/' + faker.string.numeric(10),
-      description: 'Customer support qua WhatsApp Business',
+      externalUrl: 'https://facebook.com/companysupport',
+      description: 'Fanpage chăm sóc khách hàng',
       category: 'Hỗ trợ khách hàng',
       accessToken: null,
       tokenExpiresAt: null,
       status: ChannelStatus.INACTIVE,
       lastSyncError: 'NOT_CONNECTED',
       metadata: {
-        phoneNumberId: faker.string.numeric(15),
-        displayName: 'Company Support',
-        verifiedName: 'Company Official',
+        pageId: faker.string.numeric(15),
+        pageName: 'Company Support',
       },
       groups: { create: { groupId: groups.contentGroup.id } },
       ownerships: {
@@ -605,7 +606,7 @@ async function seedChannels(
     },
   });
 
-  return { youtube, facebook, instagram, telegram, whatsapp };
+  return { youtube, facebook, tiktok, tiktokNews, facebookSupport };
 }
 
 // V2 stripped: seedPosts + seedTasks (Post + Task entities bỏ).
@@ -622,12 +623,12 @@ async function seedAnalytics(
 
   const rows: Prisma.AnalyticsCreateManyInput[] = [];
 
-  // WhatsApp INACTIVE → bỏ qua analytics
+  // Fanpage CSKH INACTIVE → bỏ qua analytics
   const channelList = [
     { ch: channels.youtube, baseViews: 50_000, baseSubs: 200_000, baseRev: 50 },
     { ch: channels.facebook, baseViews: 30_000, baseSubs: 150_000, baseRev: 20 },
-    { ch: channels.instagram, baseViews: 20_000, baseSubs: 80_000, baseRev: 10 },
-    { ch: channels.telegram, baseViews: 8_000, baseSubs: 15_000, baseRev: 0 },
+    { ch: channels.tiktok, baseViews: 20_000, baseSubs: 80_000, baseRev: 0 },
+    { ch: channels.tiktokNews, baseViews: 8_000, baseSubs: 15_000, baseRev: 0 },
   ];
 
   for (const { ch, baseViews, baseSubs, baseRev } of channelList) {
@@ -701,21 +702,21 @@ async function seedKpis(
         assignedById: users.superAdmin.id,
         status: 'IN_PROGRESS',
       },
-      // 2. PER_CHANNEL Telegram — assigned to contentStaff1 (PRIMARY owner TG)
+      // 2. PER_CHANNEL TikTok tin nhanh — assigned to contentStaff1 (PRIMARY owner)
       {
         tenantId,
         scope: 'PER_CHANNEL',
-        channelId: channels.telegram.id,
+        channelId: channels.tiktokNews.id,
         employeeId: users.contentStaff1.id,
         periodType: 'MONTHLY',
         periodStart,
         periodEnd,
         targetFollowersGain: 500,
-        notes: 'Telegram metrics minimal — chỉ track member growth',
+        notes: 'KPI tháng — tăng follower kênh TikTok tin nhanh',
         assignedById: users.contentManager.id,
         status: 'IN_PROGRESS',
       },
-      // 3. PER_EMPLOYEE contentManager — aggregate across YT + IG (2 channels owned)
+      // 3. PER_EMPLOYEE contentManager — aggregate across YT + TikTok (2 channels owned)
       {
         tenantId,
         scope: 'PER_EMPLOYEE',
@@ -784,13 +785,13 @@ async function seedAlerts(
       },
       {
         tenantId,
-        channelId: channels.instagram.id,
+        channelId: channels.tiktok.id,
         type: AlertType.API_ERROR,
         severity: AlertSeverity.CRITICAL,
-        message: 'Rate limit exceeded khi gọi Graph API',
+        message: 'Rate limit exceeded khi gọi TikTok API',
         isRead: true,
         readAt: daysAgo(1),
-        metadata: { errorCode: 17, retryAfter: 3600 },
+        metadata: { errorCode: 'rate_limit_exceeded', retryAfter: 3600 },
       },
     ],
   });
@@ -823,7 +824,7 @@ async function main() {
   console.log(`  Role-permission rows  : ${permResult.rolePermsCount}`);
   console.log(`  Groups                : 4 (SYSTEM + HR + Content + Analytics)`);
   console.log(`  Users                 : 6 (1 SuperAdmin + 5 regular)`);
-  console.log(`  Channels              : 5 (YT + FB + IG + TG + WA)`);
+  console.log(`  Channels              : 5 (YT + FB×2 + TikTok×2)`);
   console.log(`  ChannelOwnerships     : 7 (5 PRIMARY + 2 SECONDARY)`);
   console.log(`  Analytics rows        : ${analyticsCount}`);
   console.log(`  KPIs                  : ${kpiCount} (2 PER_CHANNEL + 2 PER_EMPLOYEE)`);

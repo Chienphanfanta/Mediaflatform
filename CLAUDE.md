@@ -14,7 +14,7 @@
 - Quản lý nhân viên: thông tin, vai trò, phòng ban, lịch sử công tác
 - Khai báo và phân công kênh truyền thông cho từng nhân viên (1 nhân viên có thể quản lý nhiều kênh, 1 kênh có thể có nhiều nhân viên hỗ trợ)
 - Giao KPI dual-level: KPI cho từng kênh riêng + KPI tổng cho từng nhân viên
-- Tự động sync metrics mỗi giờ từ YouTube, Facebook, Instagram, Telegram, WhatsApp
+- Tự động sync metrics mỗi giờ từ **3 nền tảng: YouTube, Facebook, TikTok** (không hỗ trợ nền tảng khác)
 - Dashboard tăng trưởng với granularity: tổng công ty / phòng ban / nhân viên / kênh
 - Có thể bán hoặc cài đặt cho team khác (mỗi team là 1 tenant riêng biệt)
 
@@ -99,9 +99,8 @@ hr-channel-tracker/
 │           │   ├── analytics/      # Aggregation & reporting
 │           │   └── platforms/      # Read-only platform clients
 │           │       ├── youtube/
-│           │       ├── meta/       # Facebook + Instagram
-│           │       ├── telegram/
-│           │       └── whatsapp/
+│           │       ├── meta/       # Facebook Pages
+│           │       └── tiktok/
 │           └── common/
 │               ├── tenant/         # Multi-tenant middleware
 │               ├── guards/
@@ -202,7 +201,7 @@ model Channel {
   tenantId      String
   name          String                    // Tên hiển thị nội bộ
   platform      Platform
-  // YOUTUBE | FACEBOOK | INSTAGRAM | TELEGRAM | WHATSAPP
+  // YOUTUBE | FACEBOOK | TIKTOK
   externalId    String                    // YouTube channelId, FB pageId, etc.
   externalUrl   String                    // Link công khai đến kênh
   description   String?
@@ -262,7 +261,7 @@ model ChannelMetric {
   viewsTotal      BigInt?                  // Tổng lifetime views
   viewsPeriod     Int?                     // Views trong period (24h)
   watchTimeHours  Float?                   // YouTube only
-  engagementRate  Float?                   // Facebook/Instagram
+  engagementRate  Float?                   // Facebook/TikTok
   impressions     Int?
   
   // Source tracking
@@ -319,7 +318,7 @@ model KPI {
 }
 
 // Enums tổng hợp
-enum Platform { YOUTUBE FACEBOOK INSTAGRAM TELEGRAM WHATSAPP }
+enum Platform { YOUTUBE FACEBOOK TIKTOK }
 enum EmployeeRole { SUPER_ADMIN TENANT_ADMIN MANAGER STAFF VIEWER }
 enum EmployeeStatus { ACTIVE INACTIVE TERMINATED }
 enum ChannelStatus { ACTIVE INACTIVE ARCHIVED }
@@ -459,11 +458,11 @@ YouTube quota: 10,000 units/day
 Facebook: 200 calls/hour/user
 - 24 calls/day = OK cho cả nghìn channels
 
-Instagram: shared với Facebook quota
-
-Telegram Bot: 30 messages/sec → không phải issue
-
-WhatsApp Business: 1000 conversations/day, không tốn cho read metrics
+TikTok (API v2 — Login Kit + Display API):
+- Mỗi sync: 1 call user/info + tối đa 5 call video/list (100 video gần nhất)
+- Không có insights theo ngày → mỗi sync ghi 1 snapshot cho NGÀY HÔM NAY,
+  views/ngày = chênh lệch tổng view video gần đây so với snapshot trước
+- access_token sống 24h → service tự refresh bằng refresh_token (365 ngày)
 ```
 
 ### Per-tenant quota tracking
@@ -547,13 +546,12 @@ YOUTUBE_API_KEY=""             # API key cho public data
 YOUTUBE_CLIENT_ID=""           # OAuth cho channel-specific data
 YOUTUBE_CLIENT_SECRET=""
 
-FACEBOOK_APP_ID=""
-FACEBOOK_APP_SECRET=""
+META_APP_ID=""                 # Facebook App (Graph API)
+META_APP_SECRET=""
 
-TELEGRAM_BOT_TOKEN=""          # Master bot token (1 bot dùng chung)
-
-WHATSAPP_BUSINESS_ID=""
-WHATSAPP_ACCESS_TOKEN=""
+TIKTOK_CLIENT_KEY=""           # TikTok Login Kit
+TIKTOK_CLIENT_SECRET=""
+TIKTOK_REDIRECT_URI=""
 
 # Email
 RESEND_API_KEY=""
@@ -604,15 +602,22 @@ SENTRY_DSN=""
 - [x] Xóa S3/R2 env vars khỏi .env.example
 - [x] Type-check sạch cả apps/web + apps/api
 
-**Đang làm (Day 2+):**
-- [ ] Refactor Channel module thành Channel Registry
-- [ ] Build KPI module
-- [ ] Multi-tenant architecture (Tenant model + Prisma extension + JWT tenantId)
-- [ ] Per-employee dashboard
-- [ ] Installer cho team khác
+**Day 2–4 + 6.1 hoàn thành:**
+- [x] Refactor Channel module thành Channel Registry (ChannelOwnership PRIMARY/SECONDARY)
+- [x] Build KPI module (schema, calculator, cron, UI giao KPI)
+- [x] Per-employee dashboard + Department module
+- [x] Multi-tenant: Tenant model + Prisma extension + JWT tenantId
 
-**Bước tiếp theo:**
-Theo file REFACTOR_PROMPTS.md — Day 2: Channel Registry refactor
+**Thu gọn nền tảng (thay cho Day 5 Telegram/WhatsApp):**
+- [x] Chỉ còn 3 nền tảng: YouTube, Facebook, TikTok — xoá Instagram, X, Telegram, WhatsApp
+- [x] Thêm TikTok: OAuth adapter (web) + TikTokService sync (api)
+- [x] Gỡ scope ghi (youtube.upload, pages_manage_posts) — chỉ xin quyền đọc
+
+**Còn lại:**
+- [ ] Nhập metrics thủ công + import CSV (Day 5.3)
+- [ ] Subdomain routing (Day 6.2), tenant settings + subscription limits (Day 6.3)
+- [ ] Installer + INSTALL_GUIDE.md (Day 7)
+- [ ] Tạo migration gốc (prisma/migrations đang rỗng)
 
 ---
 

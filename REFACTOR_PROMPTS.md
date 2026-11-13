@@ -616,6 +616,10 @@ Commit: "feat: per-employee dashboard + department module"
 
 ## DAY 5 — Telegram Bot + WhatsApp Business + Manual Input (4-5 giờ)
 
+> ⚠️ **Đã thay đổi phạm vi:** dự án chỉ còn 3 nền tảng YouTube, Facebook, TikTok.
+> Prompt 5.1 (Telegram) và 5.2 (WhatsApp) **bỏ qua** — đã thay bằng tích hợp TikTok.
+> Prompt 5.3 (Manual Input + History UI) vẫn còn hiệu lực.
+
 ### Prompt 5.1 — Telegram Bot Integration
 
 ```

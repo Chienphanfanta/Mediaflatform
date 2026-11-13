@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { formatCompact, formatHours, formatPct } from '@/lib/format';
-import { PLATFORM_LABEL } from '@/lib/platform';
+import { PLATFORM_HEX, PLATFORM_LABEL } from '@/lib/platform';
 import type { PlatformBreakdownItem } from '@/lib/types/analytics-summary';
 
 type Props = {
@@ -26,14 +26,7 @@ type Props = {
   isLoading: boolean;
 };
 
-const COLORS: Record<Platform, string> = {
-  YOUTUBE: '#FF0000',
-  FACEBOOK: '#1877F2',
-  INSTAGRAM: '#E1306C',
-  X: '#0F172A',
-  TELEGRAM: '#8B5CF6',
-  WHATSAPP: '#25D366',
-};
+const COLORS = PLATFORM_HEX;
 
 export function PlatformBreakdown({ data, isLoading }: Props) {
   const isMobile = useMobile();

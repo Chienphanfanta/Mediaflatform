@@ -1,6 +1,6 @@
-// 5 platform adapters trong 1 file để tránh fragmentation.
+// 3 platform adapters (YouTube, Facebook, TikTok) trong 1 file để tránh fragmentation.
+// V2 READ-ONLY: chỉ xin scope đọc metrics — KHÔNG xin quyền đăng/sửa nội dung.
 // Mỗi adapter implement OAuthAdapter interface từ ./base.ts.
-import crypto from 'node:crypto';
 import { Platform } from '@prisma/client';
 import type {
   AccountInfo,
@@ -21,7 +21,6 @@ const YT_TOKEN = 'https://oauth2.googleapis.com/token';
 const YT_REVOKE = 'https://oauth2.googleapis.com/revoke';
 const YT_SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
-  'https://www.googleapis.com/auth/youtube.upload',
   'https://www.googleapis.com/auth/yt-analytics.readonly',
 ];
 
@@ -143,7 +142,6 @@ const FB_GRAPH = `https://graph.facebook.com/${FB_VERSION}`;
 const FB_SCOPES = [
   'pages_show_list',
   'pages_read_engagement',
-  'pages_manage_posts',
   'read_insights',
 ];
 
@@ -213,7 +211,7 @@ export const facebookAdapter: OAuthAdapter = {
     // Lấy Page đầu tiên + page access token
     const pageInfo = await fbFetchFirstPage(long.token);
     return {
-      // Lưu PAGE access token (có thể publish), không phải user token
+      // Lưu PAGE access token (đọc insights), không phải user token
       accessToken: pageInfo.pageToken,
       refreshToken: null, // FB không có refresh — token Page có thể không expire
       expiresAt: long.expiresIn ? new Date(Date.now() + long.expiresIn * 1000) : null,
@@ -254,322 +252,158 @@ export const facebookAdapter: OAuthAdapter = {
 };
 
 // ============================================================
-// 3. INSTAGRAM — Meta Graph API (qua Facebook Page link)
+// 3. TIKTOK — TikTok Login Kit (OAuth 2.0, API v2)
 // ============================================================
-const IG_SCOPES = [
-  'pages_show_list',
-  'pages_read_engagement',
-  'instagram_basic',
-  'instagram_content_publish',
-  'instagram_manage_insights',
-];
+// access_token sống 24h, refresh_token 365 ngày.
+// Scope user.info.stats + video.list cần được TikTok duyệt trong app review.
+const TT_AUTH = 'https://www.tiktok.com/v2/auth/authorize/';
+const TT_TOKEN = 'https://open.tiktokapis.com/v2/oauth/token/';
+const TT_REVOKE = 'https://open.tiktokapis.com/v2/oauth/revoke/';
+const TT_API = 'https://open.tiktokapis.com/v2';
+const TT_SCOPES = ['user.info.basic', 'user.info.profile', 'user.info.stats', 'video.list'];
+const TT_USER_FIELDS = [
+  'open_id',
+  'display_name',
+  'username',
+  'avatar_url',
+  'profile_deep_link',
+  'follower_count',
+  'following_count',
+  'likes_count',
+  'video_count',
+].join(',');
 
-async function igFindBusinessAccount(userToken: string): Promise<AccountInfo> {
-  // List pages → check page có instagram_business_account không
-  const res = await fetch(
-    `${FB_GRAPH}/me/accounts?fields=id,name,instagram_business_account{id,username,name,followers_count,follows_count,media_count,profile_picture_url}&access_token=${encodeURIComponent(userToken)}`,
-  );
-  if (!res.ok) throw new Error(`IG list pages HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: Array<Record<string, any>> };
-  const pageWithIg = (data.data ?? []).find((p) => p.instagram_business_account);
-  if (!pageWithIg) {
-    throw new Error('Không tìm thấy IG Business Account — kiểm tra account đã link với FB Page chưa');
+type TikTokTokenResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  open_id?: string;
+  scope?: string;
+  error?: string;
+  error_description?: string;
+};
+
+async function ttFetchUser(accessToken: string): Promise<AccountInfo> {
+  const res = await fetch(`${TT_API}/user/info/?fields=${TT_USER_FIELDS}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    data?: {
+      user?: {
+        open_id?: string;
+        display_name?: string;
+        username?: string;
+        avatar_url?: string;
+        profile_deep_link?: string;
+        follower_count?: number;
+        following_count?: number;
+        likes_count?: number;
+        video_count?: number;
+      };
+    };
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || (data.error?.code && data.error.code !== 'ok')) {
+    throw new Error(`TikTok user/info HTTP ${res.status}: ${data.error?.message ?? ''}`.trim());
   }
-  const ig = pageWithIg.instagram_business_account;
+  const u = data.data?.user;
+  if (!u?.open_id) throw new Error('TikTok user/info trả không có user');
   return {
-    externalId: ig.id,
-    name: ig.name ?? ig.username,
+    externalId: u.open_id,
+    name: u.display_name ?? u.username ?? 'TikTok account',
     metadata: {
-      igUserId: ig.id,
-      username: ig.username,
-      linkedFacebookPageId: pageWithIg.id,
-      accountType: 'BUSINESS',
-      followersCount: ig.followers_count ?? 0,
-      followsCount: ig.follows_count ?? 0,
-      mediaCount: ig.media_count ?? 0,
-      profilePictureUrl: ig.profile_picture_url ?? null,
+      openId: u.open_id,
+      username: u.username ?? null,
+      displayName: u.display_name ?? null,
+      avatarUrl: u.avatar_url ?? null,
+      profileUrl: u.profile_deep_link ?? (u.username ? `https://www.tiktok.com/@${u.username}` : null),
+      followersCount: Number(u.follower_count ?? 0),
+      followingCount: Number(u.following_count ?? 0),
+      likesCount: Number(u.likes_count ?? 0),
+      videoCount: Number(u.video_count ?? 0),
     },
   };
 }
 
-export const instagramAdapter: OAuthAdapter = {
-  platform: Platform.INSTAGRAM,
+async function ttTokenRequest(params: Record<string, string>): Promise<TikTokTokenResponse> {
+  const res = await fetch(TT_TOKEN, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_key: reqEnv('TIKTOK_CLIENT_KEY'),
+      client_secret: reqEnv('TIKTOK_CLIENT_SECRET'),
+      ...params,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as TikTokTokenResponse;
+  if (!res.ok || !data.access_token) {
+    throw new Error(
+      `TikTok token HTTP ${res.status}: ${data.error_description ?? data.error ?? 'no access_token'}`,
+    );
+  }
+  return data;
+}
 
-  generateAuthUrl({ state, redirectUri }): AuthUrlResult {
-    const u = new URL(FB_AUTH); // dùng chung auth dialog với FB
-    u.searchParams.set('client_id', reqEnv('META_APP_ID'));
+async function ttToTokenSet(data: TikTokTokenResponse, fallbackRefresh?: string): Promise<TokenSet> {
+  const accessToken = data.access_token as string;
+  const account = await ttFetchUser(accessToken);
+  return {
+    accessToken,
+    refreshToken: data.refresh_token ?? fallbackRefresh ?? null,
+    expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
+    scope: data.scope ?? null,
+    account,
+  };
+}
+
+export const tiktokAdapter: OAuthAdapter = {
+  platform: Platform.TIKTOK,
+
+  generateAuthUrl({ state, redirectUri }: AuthUrlInput): AuthUrlResult {
+    const u = new URL(TT_AUTH);
+    u.searchParams.set('client_key', reqEnv('TIKTOK_CLIENT_KEY'));
     u.searchParams.set('redirect_uri', redirectUri);
-    u.searchParams.set('scope', IG_SCOPES.join(','));
-    u.searchParams.set('state', state);
     u.searchParams.set('response_type', 'code');
+    u.searchParams.set('scope', TT_SCOPES.join(','));
+    u.searchParams.set('state', state);
     return { url: u.toString() };
   },
 
-  async exchangeCode({ code, redirectUri }): Promise<TokenSet> {
-    const u = new URL(FB_TOKEN);
-    u.searchParams.set('client_id', reqEnv('META_APP_ID'));
-    u.searchParams.set('client_secret', reqEnv('META_APP_SECRET'));
-    u.searchParams.set('code', code);
-    u.searchParams.set('redirect_uri', redirectUri);
-    const res = await fetch(u);
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`IG exchange HTTP ${res.status}: ${txt.slice(0, 200)}`);
-    }
-    const data = (await res.json()) as Record<string, any>;
-    const long = await fbExchangeLongLived(data.access_token);
-    const account = await igFindBusinessAccount(long.token);
-    return {
-      accessToken: long.token, // user token long-lived
-      refreshToken: null,
-      expiresAt: long.expiresIn ? new Date(Date.now() + long.expiresIn * 1000) : null,
-      scope: IG_SCOPES.join(','),
-      account,
-    };
+  async exchangeCode({ code, redirectUri }: ExchangeInput): Promise<TokenSet> {
+    const data = await ttTokenRequest({
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+    });
+    return ttToTokenSet(data);
   },
 
   async refreshAccessToken(refreshToken: string): Promise<TokenSet> {
-    void refreshToken;
-    throw new Error('Instagram (Meta) không hỗ trợ refresh — user phải reconnect');
+    const data = await ttTokenRequest({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    });
+    return ttToTokenSet(data, refreshToken);
   },
 
   async revokeToken(accessToken: string): Promise<void> {
-    await fetch(`${FB_GRAPH}/me/permissions?access_token=${encodeURIComponent(accessToken)}`, {
-      method: 'DELETE',
+    await fetch(TT_REVOKE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_key: reqEnv('TIKTOK_CLIENT_KEY'),
+        client_secret: reqEnv('TIKTOK_CLIENT_SECRET'),
+        token: accessToken,
+      }),
     }).catch(() => {});
   },
 
   async verifyToken(accessToken: string): Promise<VerifyResult> {
     try {
-      const account = await igFindBusinessAccount(accessToken);
+      const account = await ttFetchUser(accessToken);
       return { valid: true, account: { externalId: account.externalId, name: account.name } };
     } catch (e) {
       return { valid: false, reason: (e as Error).message };
     }
   },
-};
-
-// ============================================================
-// 4. X (Twitter) — OAuth 2.0 + PKCE
-// ============================================================
-const X_AUTH = 'https://x.com/i/oauth2/authorize';
-const X_TOKEN = 'https://api.x.com/2/oauth2/token';
-const X_REVOKE = 'https://api.x.com/2/oauth2/revoke';
-const X_USER = 'https://api.x.com/2/users/me';
-const X_SCOPES = ['tweet.read', 'tweet.write', 'users.read', 'offline.access'];
-
-function pkce() {
-  const verifier = crypto.randomBytes(32).toString('base64url');
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  return { verifier, challenge };
-}
-
-async function xFetchUser(accessToken: string): Promise<AccountInfo> {
-  const res = await fetch(
-    `${X_USER}?user.fields=id,username,name,verified,public_metrics,profile_image_url`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  if (!res.ok) throw new Error(`X /users/me HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: Record<string, any> };
-  const u = data.data;
-  if (!u) throw new Error('X /users/me trả không có data');
-  return {
-    externalId: u.id,
-    name: u.name ?? u.username,
-    metadata: {
-      userId: u.id,
-      username: u.username,
-      verified: !!u.verified,
-      followersCount: u.public_metrics?.followers_count ?? 0,
-      followingCount: u.public_metrics?.following_count ?? 0,
-      tweetCount: u.public_metrics?.tweet_count ?? 0,
-      profileImageUrl: u.profile_image_url ?? null,
-    },
-  };
-}
-
-function xBasicAuth(): string {
-  return (
-    'Basic ' +
-    Buffer.from(`${reqEnv('X_CLIENT_ID')}:${reqEnv('X_CLIENT_SECRET')}`).toString('base64')
-  );
-}
-
-export const xAdapter: OAuthAdapter = {
-  platform: Platform.X,
-
-  generateAuthUrl({ state, redirectUri }): AuthUrlResult {
-    const { verifier, challenge } = pkce();
-    const u = new URL(X_AUTH);
-    u.searchParams.set('response_type', 'code');
-    u.searchParams.set('client_id', reqEnv('X_CLIENT_ID'));
-    u.searchParams.set('redirect_uri', redirectUri);
-    u.searchParams.set('scope', X_SCOPES.join(' '));
-    u.searchParams.set('state', state);
-    u.searchParams.set('code_challenge', challenge);
-    u.searchParams.set('code_challenge_method', 'S256');
-    return { url: u.toString(), codeVerifier: verifier };
-  },
-
-  async exchangeCode({ code, redirectUri, codeVerifier }): Promise<TokenSet> {
-    if (!codeVerifier) throw new Error('X exchange thiếu codeVerifier (PKCE)');
-    const res = await fetch(X_TOKEN, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: xBasicAuth(),
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri,
-        code_verifier: codeVerifier,
-      }),
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`X exchange HTTP ${res.status}: ${txt.slice(0, 200)}`);
-    }
-    const data = (await res.json()) as Record<string, any>;
-    const account = await xFetchUser(data.access_token);
-    return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? null,
-      expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
-      scope: data.scope ?? null,
-      account,
-    };
-  },
-
-  async refreshAccessToken(refreshToken: string): Promise<TokenSet> {
-    const res = await fetch(X_TOKEN, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: xBasicAuth(),
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-      }),
-    });
-    if (!res.ok) throw new Error(`X refresh HTTP ${res.status}`);
-    const data = (await res.json()) as Record<string, any>;
-    const account = await xFetchUser(data.access_token);
-    return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? refreshToken,
-      expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
-      scope: data.scope ?? null,
-      account,
-    };
-  },
-
-  async revokeToken(accessToken: string): Promise<void> {
-    await fetch(X_REVOKE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: xBasicAuth(),
-      },
-      body: new URLSearchParams({ token: accessToken, token_type_hint: 'access_token' }),
-    }).catch(() => {});
-  },
-
-  async verifyToken(accessToken: string): Promise<VerifyResult> {
-    try {
-      const account = await xFetchUser(accessToken);
-      return { valid: true, account: { externalId: account.externalId, name: account.name } };
-    } catch (e) {
-      return { valid: false, reason: (e as Error).message };
-    }
-  },
-};
-
-// ============================================================
-// 5. TELEGRAM — Bot Token (KHÔNG dùng OAuth chuẩn)
-// ============================================================
-async function tgGetMe(botToken: string): Promise<AccountInfo> {
-  const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
-  if (!res.ok) throw new Error(`Telegram getMe HTTP ${res.status}`);
-  const data = (await res.json()) as {
-    ok: boolean;
-    result?: { id: number; username: string; first_name: string; can_join_groups?: boolean };
-    description?: string;
-  };
-  if (!data.ok || !data.result) {
-    throw new Error(data.description ?? 'Bot token invalid');
-  }
-  const r = data.result;
-  return {
-    externalId: String(r.id),
-    name: `@${r.username}`,
-    metadata: {
-      botId: r.id,
-      botUsername: r.username,
-      botFirstName: r.first_name,
-      canJoinGroups: r.can_join_groups ?? null,
-      // chatId sẽ điền sau khi user add bot vào channel/group đích
-      chatId: null,
-      chatType: null,
-      title: null,
-    },
-  };
-}
-
-export const telegramAdapter: OAuthAdapter = {
-  platform: Platform.TELEGRAM,
-
-  generateAuthUrl(): AuthUrlResult | null {
-    return null; // Telegram không OAuth — caller dùng connectViaToken
-  },
-
-  async exchangeCode(): Promise<TokenSet> {
-    throw new Error('Telegram không dùng OAuth code exchange');
-  },
-
-  async refreshAccessToken(): Promise<TokenSet> {
-    throw new Error('Telegram bot token không cần refresh');
-  },
-
-  async revokeToken(): Promise<void> {
-    // Bot token chỉ revoke được qua @BotFather (manual). No-op.
-  },
-
-  async verifyToken(accessToken: string): Promise<VerifyResult> {
-    try {
-      const account = await tgGetMe(accessToken);
-      return { valid: true, account: { externalId: account.externalId, name: account.name } };
-    } catch (e) {
-      return { valid: false, reason: (e as Error).message };
-    }
-  },
-
-  async connectViaToken(botToken: string, opts?: { name?: string }): Promise<TokenSet> {
-    const account = await tgGetMe(botToken);
-    if (opts?.name) account.name = opts.name;
-    return {
-      accessToken: botToken,
-      refreshToken: null,
-      expiresAt: null, // Bot token vĩnh viễn (đến khi revoke ở @BotFather)
-      scope: 'bot',
-      account,
-    };
-  },
-};
-
-// ============================================================
-// WHATSAPP — placeholder (chưa implement)
-// ============================================================
-export const whatsappAdapter: OAuthAdapter = {
-  platform: Platform.WHATSAPP,
-  generateAuthUrl: () => null,
-  exchangeCode: async () => {
-    throw new Error('WhatsApp connection chưa implement (Phase 6+)');
-  },
-  refreshAccessToken: async () => {
-    throw new Error('WhatsApp chưa implement');
-  },
-  revokeToken: async () => {},
-  verifyToken: async () => ({ valid: false, reason: 'WhatsApp adapter chưa implement' }),
 };

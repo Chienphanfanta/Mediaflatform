@@ -1,6 +1,6 @@
 // Abstract base cho mọi PlatformService — cung cấp retry với exponential backoff
 // và helper load channel + decrypt token. Subclass override withTokenRefresh nếu
-// platform có refresh flow (vd Twitter), hoặc dùng decrypt thẳng (Telegram, WhatsApp).
+// platform có refresh flow (vd YouTube, TikTok), hoặc dùng decrypt thẳng (Facebook Page token).
 import {
   BadRequestException,
   Logger,
@@ -68,7 +68,7 @@ export abstract class BasePlatformService {
           );
           throw e;
         }
-        // Honour explicit retry-after nếu error có (vd Telegram, Meta)
+        // Honour explicit retry-after nếu error có (vd Meta)
         const explicit = extractRetryAfterMs(e);
         const baseBackoff = baseDelayMs * Math.pow(2, i);
         const jitter = Math.random() * 500;

@@ -10,7 +10,7 @@ export type AuthUrlInput = {
 
 export type AuthUrlResult = {
   url: string;
-  /** Set khi platform dùng PKCE (X) — phải lưu phía server đến lúc callback. */
+  /** Set khi platform dùng PKCE — phải lưu phía server đến lúc callback. */
   codeVerifier?: string;
 };
 
@@ -50,7 +50,7 @@ export interface OAuthAdapter {
   platform: Platform;
 
   /**
-   * Trả null cho platform KHÔNG dùng OAuth chuẩn (Telegram bot).
+   * Trả null cho platform KHÔNG dùng OAuth chuẩn.
    * Caller cần chuyển sang flow nhập token thủ công.
    */
   generateAuthUrl(input: AuthUrlInput): AuthUrlResult | null;
@@ -65,7 +65,7 @@ export interface OAuthAdapter {
   verifyToken(accessToken: string): Promise<VerifyResult>;
 
   /**
-   * Optional: kết nối qua token thủ công (Telegram bot token).
+   * Optional: kết nối qua token thủ công (nhập token tay).
    * Trả về TokenSet như exchangeCode để pipeline tạo Channel dùng chung.
    */
   connectViaToken?(token: string, opts?: { name?: string }): Promise<TokenSet>;
