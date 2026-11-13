@@ -37,19 +37,13 @@ export const GET = withAuth(async ({ req, user }) => {
   ]);
 
   const items = await Promise.all(rows.map((p) => serializePost(p)));
-  return ok(
-    { items },
-    {
-      meta: {
-        pagination: {
-          page: q.page,
-          pageSize: q.pageSize,
-          total,
-          totalPages: Math.ceil(total / q.pageSize),
-        },
-      },
-    },
-  );
+  const pagination = {
+    page: q.page,
+    pageSize: q.pageSize,
+    total,
+    totalPages: Math.ceil(total / q.pageSize),
+  };
+  return ok({ items, pagination }, { meta: { pagination } });
 });
 
 export const POST = withAuth(

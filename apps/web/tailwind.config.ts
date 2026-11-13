@@ -6,6 +6,9 @@ const config: Config = {
   content: [
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    // Class Tailwind khai báo trong lib (vd PLATFORM_DOT/PLATFORM_BG ở lib/platform.ts)
+    './src/lib/**/*.{js,ts,jsx,tsx}',
+    './src/hooks/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     container: {
